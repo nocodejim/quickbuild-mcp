@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+
+WORKDIR /usr/src/app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code and tests
+COPY src/ ./src/
+COPY tests/ ./tests/
+COPY pytest.ini .
+
+# Run tests with coverage
+CMD ["python", "-m", "pytest", "tests/", "-v", "--cov=src", "--cov-report=term-missing", "--cov-report=html:/coverage"]

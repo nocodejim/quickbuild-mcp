@@ -15,3 +15,17 @@ services:
     volumes:
       # Development volume mount - remove for production
       - ./src:/usr/src/app/src
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      - QB_URL=http://mock-quickbuild:8810
+      - QB_USER=testuser
+      - QB_PASSWORD=testpass
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./coverage:/coverage
+    profiles:
+      - test
