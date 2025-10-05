@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  mcp-quickbuild-server:
+    build: .
+    ports:
+      - "14002:14002"
+    environment:
+      - QB_URL=${QB_URL:-http://localhost:8810}
+      - QB_USER=${QB_USER:-admin}
+      - QB_PASSWORD=${QB_PASSWORD}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MCP_PORT=${MCP_PORT:-14002}
+    restart: unless-stopped
+    volumes:
+      # Development volume mount - remove for production
+      - ./src:/usr/src/app/src
