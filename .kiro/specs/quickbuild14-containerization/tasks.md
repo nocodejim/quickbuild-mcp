@@ -110,19 +110,24 @@
     - Implement auto-detection of container IP
     - Generate node.properties with server connection details
     - Configure agent registration with QuickBuild server
+
     - _Requirements: 3.2, 3.6_
+
 
   - [ ] 4.3 Create specialized agent Dockerfiles
     - Create qb-agent-maven Dockerfile with Maven 3.8.x
     - Create qb-agent-node Dockerfile with Node.js 16.x via NVM
+
     - Create qb-agent-dotnet Dockerfile with .NET SDK 6.0
     - _Requirements: 3.3_
 
-  - [ ]* 4.4 Write agent container unit tests
+  - [x]* 4.4 Write agent container unit tests
+
     - Test base agent functionality
     - Test specialized agent toolchain installations
     - Test agent registration process
     - _Requirements: 3.1, 3.2, 3.3_
+
 
 - [ ] 5. Create Docker Compose orchestration
   - [ ] 5.1 Implement Docker Compose configuration
@@ -133,19 +138,28 @@
 
   - [ ] 5.2 Configure Docker Compose volumes and secrets
     - Define persistent volumes for database and server data
+
     - Configure Docker secrets for sensitive data
     - Set up resource limits and reservations
     - _Requirements: 4.4, 5.2, 8.2_
 
-  - [ ] 5.3 Implement Docker Compose scaling configuration
+  - [x] 5.3 Implement Docker Compose scaling configuration
+
+
+
+
     - Configure agent services for horizontal scaling
     - Set up proper networking for scaled services
     - _Requirements: 4.6, 8.6_
+
+
 
   - [ ]* 5.4 Write Docker Compose integration tests
     - Test service startup order
     - Test inter-service communication
     - Test scaling operations
+
+
     - _Requirements: 4.1, 4.2, 4.6_
 
 - [ ] 6. Create Kubernetes manifests
@@ -154,13 +168,19 @@
     - Create rbac.yaml with appropriate service accounts and permissions
     - _Requirements: 4.3_
 
-  - [ ] 6.2 Create Kubernetes ConfigMaps and Secrets
+  - [x] 6.2 Create Kubernetes ConfigMaps and Secrets
+
+
+
+
     - Create configmap.yaml for non-sensitive configuration
     - Create secrets.yaml template for sensitive data
     - _Requirements: 5.2_
 
   - [ ] 6.3 Implement Kubernetes StatefulSets
     - Create mssql-statefulset.yaml with persistent volume claims
+
+
     - Create qb-server-statefulset.yaml with data persistence
     - Configure proper resource requests and limits
     - _Requirements: 4.3, 4.4, 8.2_
@@ -171,10 +191,15 @@
     - Create ingress.yaml for external access to QB server
     - _Requirements: 4.3, 5.4_
 
+
+
+
+
   - [ ] 6.5 Implement Kubernetes persistent volume claims
     - Create pvc.yaml for database and server data storage
     - Configure appropriate storage classes and access modes
     - _Requirements: 6.1, 6.2_
+
 
   - [ ]* 6.6 Write Kubernetes deployment tests
     - Test StatefulSet deployment and scaling
@@ -182,12 +207,14 @@
     - Test persistent volume functionality
     - _Requirements: 4.3, 4.4, 6.1_
 
+
 - [ ] 7. Implement backup and restore functionality
   - [ ] 7.1 Create backup scripts
     - Create backup.sh for Docker Compose environments
     - Implement database backup using SQL Server tools
     - Create timestamped backup files with proper naming
     - _Requirements: 6.3, 6.7_
+
 
   - [ ] 7.2 Create restore scripts
     - Create restore.sh for data recovery procedures

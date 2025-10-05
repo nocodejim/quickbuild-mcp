@@ -1,0 +1,98 @@
+# QuickBuild 14 Microsoft SQL Server StatefulSet
+# Provides persistent database service for QuickBuild
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qb-database
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  serviceName: qb-database-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickbuild
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quickbuild
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: quickbuild-containerization
+    spec:
+      containers:
+      - name: mssql
+        image: qb-database:latest  # Built from qb-database/Dockerfile
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 1433
+          name: mssql
+        env:
+        - name: ACCEPT_EULA
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-database-config
+              key: ACCEPT_EULA
+        - name: MSSQL_PID
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-database-config
+              key: MSSQL_PID
+        - name: MSSQL_COLLATION
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-database-config
+              key: MSSQL_COLLATION
+        - name: SA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: quickbuild-database-secrets
+              key: SA_PASSWORD
+        - name: QB_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: quickbuild-database-secrets
+              key: QB_DB_PASSWORD
+        volumeMounts:
+        - name: mssql-data
+          mountPath: /var/opt/mssql/data
+        - name: mssql-logs
+          mountPath: /var/opt/mssql/log
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          exec:
+            command:
+            - /opt/mssql-scripts/healthcheck.sh
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /opt/mssql-scripts/healthcheck.sh
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: mssql-data
+        persistentVolumeClaim:
+          claimName: qb-database-data-pvc
+      - name: mssql-logs
+        persistentVolumeClaim:
+          claimName: qb-database-logs-pvc
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0

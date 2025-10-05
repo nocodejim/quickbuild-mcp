@@ -1,0 +1,70 @@
+# QuickBuild 14 Kubernetes ConfigMaps
+# Non-sensitive configuration data for QuickBuild components
+
+---
+# ConfigMap for QuickBuild Server Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quickbuild-server-config
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: quickbuild-containerization
+data:
+  # Database configuration
+  QB_DB_TYPE: "mssql"
+  QB_DB_HOST: "qb-database-service"
+  QB_DB_PORT: "1433"
+  QB_DB_NAME: "quickbuild"
+  QB_DB_USER: "qb_user"
+  
+  # Server configuration
+  QB_SERVER_PORT: "8810"
+  QB_SERVER_URL: "http://qb-server-service:8810"
+  QB_LOG_LEVEL: "INFO"
+  
+  # Performance settings
+  JAVA_OPTS: "-Xmx2048m -Xms1024m -XX:MaxPermSize=512m"
+
+---
+# ConfigMap for Database Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quickbuild-database-config
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: quickbuild-containerization
+data:
+  # SQL Server configuration
+  ACCEPT_EULA: "Y"
+  MSSQL_PID: "Express"
+  MSSQL_COLLATION: "SQL_Latin1_General_CP1_CI_AS"
+
+---
+# ConfigMap for Agent Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quickbuild-agent-config
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: quickbuild-containerization
+data:
+  # Agent configuration
+  QB_SERVER_URL: "http://qb-server-service:8810"
+  AGENT_PORT: "8811"
+  
+  # Maven configuration
+  MAVEN_OPTS: "-Xmx1024m -XX:MaxPermSize=256m"
+  
+  # .NET configuration
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+  DOTNET_NOLOGO: "1"
