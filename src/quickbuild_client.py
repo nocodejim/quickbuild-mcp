@@ -56,6 +56,9 @@ class QuickBuildClient:
                 "Cannot connect to QuickBuild server",
                 ERROR_MAPPINGS["CONNECTION_ERROR"]
             )
+        except AuthenticationError:
+            # Re-raise authentication errors as-is
+            raise
         except Exception as e:
             logger.error(f"Unexpected error during authentication: {e}")
             raise QuickBuildError(
