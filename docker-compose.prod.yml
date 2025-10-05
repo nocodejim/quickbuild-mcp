@@ -1,0 +1,155 @@
+# QuickBuild 14 Production Docker Compose Override
+# Extends docker-compose.yml with production-specific configurations
+# Includes secrets management, resource limits, and security enhancements
+
+version: '3.8'
+
+services:
+  # Database with secrets and production settings
+  qb-database:
+    environment:
+      - SA_PASSWORD_FILE=/run/secrets/mssql_sa_password
+      - QB_DB_PASSWORD_FILE=/run/secrets/qb_db_password
+    secrets:
+      - mssql_sa_password
+      - qb_db_password
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+
+  # Server with secrets and production settings
+  qb-server:
+    environment:
+      - QB_DB_PASSWORD_FILE=/run/secrets/qb_db_password
+      - QB_ENABLE_TLS=${QB_ENABLE_TLS:-true}
+      - QB_TLS_CERT_PATH=/run/secrets/qb_tls_cert
+      - QB_TLS_KEY_PATH=/run/secrets/qb_tls_key
+    secrets:
+      - qb_db_password
+      - qb_tls_cert
+      - qb_tls_key
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+
+  # Base agent with production settings
+  qb-agent-base:
+    deploy:
+      replicas: ${AGENT_BASE_REPLICAS:-2}
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 60s
+
+  # Maven agent with production settings
+  qb-agent-maven:
+    environment:
+      - MAVEN_OPTS=-Xmx2048m -XX:MaxPermSize=512m
+    deploy:
+      replicas: ${AGENT_MAVEN_REPLICAS:-2}
+      resources:
+        limits:
+          cpus: '4'
+          memory: 6G
+        reservations:
+          cpus: '2'
+          memory: 4G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 60s
+
+  # Node.js agent with production settings
+  qb-agent-node:
+    deploy:
+      replicas: ${AGENT_NODE_REPLICAS:-2}
+      resources:
+        limits:
+          cpus: '4'
+          memory: 6G
+        reservations:
+          cpus: '2'
+          memory: 4G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 60s
+
+  # .NET agent with production settings
+  qb-agent-dotnet:
+    deploy:
+      replicas: ${AGENT_DOTNET_REPLICAS:-2}
+      resources:
+        limits:
+          cpus: '4'
+          memory: 6G
+        reservations:
+          cpus: '2'
+          memory: 4G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 60s
+
+# Docker secrets for production
+secrets:
+  mssql_sa_password:
+    file: ./secrets/mssql_sa_password.txt
+  qb_db_password:
+    file: ./secrets/qb_db_password.txt
+  qb_tls_cert:
+    file: ./secrets/qb_server.crt
+  qb_tls_key:
+    file: ./secrets/qb_server.key
+
+# Production volume configuration
+volumes:
+  qb-db-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${QB_DATA_PATH:-/opt/quickbuild/data}/db-data
+  qb-db-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${QB_DATA_PATH:-/opt/quickbuild/data}/db-logs
+  qb-server-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${QB_DATA_PATH:-/opt/quickbuild/data}/server-data

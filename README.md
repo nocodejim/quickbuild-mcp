@@ -1,211 +1,129 @@
-# QuickBuild MCP Server
+# QuickBuild 14 Containerization with Microsoft SQL Server
 
-A Model Context Protocol (MCP) server that provides AI agents and LLMs with standardized access to QuickBuild v14 CI/CD systems.
+> **Status:** 🚧 In Development - Implementation in Progress
 
-## Overview
+A production-ready, multi-tiered containerized deployment of QuickBuild 14 with Microsoft SQL Server as the database backend.
 
-This server acts as a bridge between MCP clients and QuickBuild REST API, enabling AI agents to:
-- List build configurations
-- Trigger builds with optional variables
-- Check build status
-- Monitor build agent grid
-- Access SCM changes for builds
+## 🏗️ Project Overview
 
-## Features
+This project provides complete Docker infrastructure for QuickBuild 14 with:
+- **Database Tier:** Microsoft SQL Server 2022 (Linux container)
+- **Application Tier:** QuickBuild 14 Server with dynamic configuration
+- **Agent Tier:** Scalable build agents (Base, Maven, Node.js, .NET variants)
 
-### MCP Tools
-- `builds.trigger` - Trigger new builds for configurations
-- `builds.get_latest_status` - Get latest build status for configurations
-- `grid.list_agents` - List all build agents and their status
+## 📋 Current Implementation Status
 
-### MCP Resources
-- `configurations://list` - List all build configurations
-- `changes://build/{build_id}` - Get SCM changes for specific builds
+- [x] Project structure and configuration templates
+- [ ] Database container (Microsoft SQL Server)
+- [ ] QuickBuild server container
+- [ ] Build agent containers
+- [ ] Docker Compose orchestration
+- [ ] Kubernetes manifests
+- [ ] Documentation and validation scripts
 
-## Quick Start
+## 🚀 Quick Start (Coming Soon)
+
+*Full quick start guide will be available when implementation is complete.*
 
 ### Prerequisites
-- Docker and Docker Compose
-- QuickBuild v14 instance with REST API enabled
-- Valid QuickBuild user credentials
 
-### Setup
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+- 4GB+ available RAM
+- 20GB+ available disk space
 
-1. Clone the repository:
+### Basic Setup
+
 ```bash
+# Clone the repository
 git clone <repository-url>
-cd quickbuild-mcp-server
-```
+cd quickbuild14-containerization
 
-2. Create environment file:
-```bash
+# Copy environment template
 cp .env.example .env
-```
 
-3. Configure your QuickBuild connection in `.env`:
-```env
-QB_URL=http://your-quickbuild-host:8810
-QB_USER=admin
-QB_PASSWORD=your_password
-LOG_LEVEL=INFO
-MCP_PORT=14002
-```
+# Edit .env with your configuration
+# (Update passwords and settings)
 
-4. Start the server:
-```bash
+# Start the stack (when implementation complete)
 docker-compose up -d
 ```
 
-The server will be available on port 14002.
+## 📁 Project Structure
 
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `QB_URL` | QuickBuild server URL | `http://localhost:8810` |
-| `QB_USER` | QuickBuild username | `admin` |
-| `QB_PASSWORD` | QuickBuild password | *Required* |
-| `LOG_LEVEL` | Logging level (DEBUG, INFO, WARN, ERROR) | `INFO` |
-| `MCP_PORT` | MCP server port | `14002` |
-
-## Usage Examples
-
-### Using with MCP Client
-
-Connect your MCP client to `stdio://path/to/server` or configure as needed for your specific MCP client.
-
-### Available Tools
-
-#### builds.trigger
-Trigger a new build for a configuration:
-```json
-{
-  "name": "builds.trigger",
-  "arguments": {
-    "configuration_id": "123",
-    "variables": {
-      "BRANCH": "main",
-      "ENVIRONMENT": "staging"
-    }
-  }
-}
+```
+quickbuild14-mssql/
+├── qb-server/              # QuickBuild server container
+├── qb-database/            # Microsoft SQL Server container  
+├── qb-agent/               # Build agent containers
+│   ├── base/               # Base agent image
+│   ├── maven/              # Maven-enabled agent
+│   ├── node/               # Node.js-enabled agent
+│   └── dotnet/             # .NET-enabled agent
+├── kubernetes/             # Kubernetes deployment manifests
+├── docs/                   # Comprehensive documentation
+├── scripts/                # Operational scripts
+├── docker-compose.yml      # Docker Compose orchestration
+├── .env.example           # Environment configuration template
+└── README.md              # This file
 ```
 
-#### builds.get_latest_status
-Get the latest build status:
-```json
-{
-  "name": "builds.get_latest_status",
-  "arguments": {
-    "configuration_id": "123"
-  }
-}
-```
+## 🔧 Configuration
 
-#### grid.list_agents
-List all build agents:
-```json
-{
-  "name": "grid.list_agents",
-  "arguments": {}
-}
-```
+All configuration is managed through environment variables. See `.env.example` for complete reference.
 
-### Available Resources
+### Key Configuration Areas
 
-#### configurations://list
-Lists all build configurations with their metadata.
+- **Database:** SQL Server connection, authentication, storage
+- **Server:** QuickBuild server settings, networking, persistence  
+- **Agents:** Agent scaling, toolchain selection, registration
+- **Security:** TLS/SSL, secrets management, access controls
+- **Operations:** Monitoring, logging, backup configuration
 
-#### changes://build/{build_id}
-Gets SCM changes for a specific build ID.
+## 📚 Documentation
 
-## Development
+Comprehensive documentation will be available in the `docs/` directory:
 
-### Project Structure
-```
-src/
-├── models/           # Data models
-├── features/         # Feature modules
-│   ├── builds/       # Build operations
-│   ├── configurations/ # Configuration management
-│   ├── grid/         # Agent grid operations
-│   └── changes/      # SCM changes
-├── quickbuild_client.py # QuickBuild API client
-├── exceptions.py     # Custom exceptions
-└── server.py         # Main MCP server
-```
+- **DEPLOYMENT.md** - Detailed deployment procedures
+- **CONFIGURATION.md** - Complete configuration reference
+- **BACKUP-RESTORE.md** - Backup and restore procedures
+- **TROUBLESHOOTING.md** - Common issues and solutions
+- **SECURITY.md** - Security best practices
 
-### Running in Development Mode
+## 🔒 Security Features
 
-1. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+- Non-root container execution
+- Secrets management via Docker/Kubernetes secrets
+- Network isolation and port restrictions
+- Vulnerability scanning integration
+- TLS/SSL support for production deployments
 
-2. Set environment variables and run:
-```bash
-python -m src.server
-```
+## 📊 Monitoring & Operations
 
-### Adding New Features
+- Health checks for all services
+- Centralized logging configuration
+- Backup and restore automation
+- Performance monitoring guidelines
+- Scaling procedures for build agents
 
-1. Create a new feature module in `src/features/`
-2. Implement the `Feature` base class
-3. Register the feature in `src/server.py`
+## 🤝 Contributing
 
-## Error Handling
+This project follows a specification-driven development approach. See:
+- Requirements: `.kiro/specs/quickbuild14-containerization/requirements.md`
+- Design: `.kiro/specs/quickbuild14-containerization/design.md`  
+- Tasks: `.kiro/specs/quickbuild14-containerization/tasks.md`
 
-The server provides comprehensive error handling for:
-- Authentication failures
-- Network connectivity issues
-- Invalid parameters
-- QuickBuild API errors
-- Resource not found scenarios
+## 📄 License
 
-All errors are logged and returned as structured JSON responses.
+[License information to be added]
 
-## Security
+## 🆘 Support
 
-- Credentials are passed via environment variables only
-- No hardcoded secrets in source code
-- Stateless operation with QuickBuild as source of truth
-- Input validation on all tool parameters
+For issues and questions:
+- Check the troubleshooting documentation (when available)
+- Review the implementation logs in `environment/docs/`
+- Open an issue in the project repository
 
-## Troubleshooting
+---
 
-### Common Issues
-
-**Connection refused to QuickBuild**
-- Verify `QB_URL` is correct and accessible
-- Check QuickBuild server is running
-- Ensure REST API is enabled in QuickBuild
-
-**Authentication failed**
-- Verify `QB_USER` and `QB_PASSWORD` are correct
-- Check user has necessary permissions in QuickBuild
-
-**Tool not found**
-- Ensure you're using the correct tool names
-- Check server logs for feature loading errors
-
-### Logs
-
-View server logs:
-```bash
-docker-compose logs -f mcp-quickbuild-server
-```
-
-Set debug logging:
-```env
-LOG_LEVEL=DEBUG
-```
-
-## License
-
-[Add your license information here]
-
-## Contributing
-
-[Add contribution guidelines here]
+**Implementation Progress:** This project is actively being developed following a comprehensive specification. Check `environment/docs/project-overview.md` for current status and progress updates.
