@@ -54,31 +54,31 @@ docker logs qb-database | tail -10
 ```bash
 # Test SQL Server connectivity first (using newer sqlcmd with SSL bypass)
 docker exec qb-database /opt/mssql-tools18/bin/sqlcmd \
-  -S localhost -U sa -P "TestPassword123!" \
+  -S localhost -U sa -P 'TestPassword123!' \
   -C \
   -Q "SELECT @@VERSION"
 
 # If the above works, create the QuickBuild database
 docker exec qb-database /opt/mssql-tools18/bin/sqlcmd \
-  -S localhost -U sa -P "TestPassword123!" \
+  -S localhost -U sa -P 'TestPassword123!' \
   -C \
   -Q "CREATE DATABASE quickbuild COLLATE SQL_Latin1_General_CP1_CI_AS;"
 
-# Create QuickBuild user
+# Create QuickBuild user (note: using single quotes to avoid bash history expansion)
 docker exec qb-database /opt/mssql-tools18/bin/sqlcmd \
-  -S localhost -U sa -P "TestPassword123!" \
+  -S localhost -U sa -P 'TestPassword123!' \
   -C \
-  -Q "CREATE LOGIN qb_user WITH PASSWORD = 'QBTestPassword123!';"
+  -Q "CREATE LOGIN qb_user WITH PASSWORD = 'QBTestPassword123';"
 
 # Grant permissions
 docker exec qb-database /opt/mssql-tools18/bin/sqlcmd \
-  -S localhost -U sa -P "TestPassword123!" \
+  -S localhost -U sa -P 'TestPassword123!' \
   -C \
   -Q "USE quickbuild; CREATE USER qb_user FOR LOGIN qb_user; ALTER ROLE db_owner ADD MEMBER qb_user;"
 
 # Verify database setup
 docker exec qb-database /opt/mssql-tools18/bin/sqlcmd \
-  -S localhost -U qb_user -P "QBTestPassword123!" \
+  -S localhost -U qb_user -P 'QBTestPassword123' \
   -C \
   -Q "USE quickbuild; SELECT DB_NAME();"
 ```
@@ -108,7 +108,7 @@ docker run -d \
   -e QB_DB_PORT=1433 \
   -e QB_DB_NAME=quickbuild \
   -e QB_DB_USER=qb_user \
-  -e QB_DB_PASSWORD=QBTestPassword123! \
+  -e QB_DB_PASSWORD=QBTestPassword123 \
   -e QB_SERVER_PORT=8810 \
   -p 8810:8810 \
   quickbuild14-test-qb-server
@@ -155,7 +155,7 @@ docker logs qb-database
 
 # Test direct database connection
 docker exec qb-server /opt/mssql-tools18/bin/sqlcmd \
-  -S qb-database -U qb_user -P "QBTestPassword123!" \
+  -S qb-database -U qb_user -P 'QBTestPassword123' \
   -C \
   -Q "SELECT 1"
 ```
@@ -239,7 +239,8 @@ docker-compose up -d qb-server
 ### "Database connection failed"
 - **Solution**: Verify database setup in Step 3
 - **Check**: Test connection manually with sqlcmd
-- **SSL Error**: Use `-C` flag to bypass certificate validation: `sqlcmd -S localhost -U sa -P "password" -C -Q "SELECT 1"`
+- **SSL Error**: Use `-C` flag to bypass certificate validation: `sqlcmd -S localhost -U sa -P 'password' -C -Q "SELECT 1"`
+- **Password with !**: Use single quotes around passwords containing `!` to avoid bash history expansion
 
 ### "sqlcmd not found" or "mssql-tools not found"
 - **Solution**: Modern SQL Server containers use `/opt/mssql-tools18/bin/sqlcmd`
