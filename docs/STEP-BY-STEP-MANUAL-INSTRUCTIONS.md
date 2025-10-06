@@ -92,6 +92,8 @@ docker-compose build qb-server
 docker images | grep quickbuild
 ```
 
+**Note**: If you encounter Java Service Wrapper license errors, the container is configured to bypass the wrapper and start QuickBuild directly with Java.
+
 ## Step 5: Start QuickBuild Server
 ```bash
 # Create a custom network for communication
@@ -250,6 +252,12 @@ docker-compose up -d qb-server
 ### "QuickBuild won't start"
 - **Solution**: Check if QuickBuild files are properly copied
 - **Check**: `docker exec qb-server ls -la /opt/quickbuild/bin/`
+
+### "Java Service Wrapper License Error"
+- **Problem**: QuickBuild uses Java Service Wrapper which requires a license
+- **Solution**: The container is configured to bypass the wrapper and start QuickBuild directly with Java
+- **Check**: Look for "Starting QuickBuild directly with Java" in the logs
+- **Alternative**: If still using wrapper, rebuild the container with the updated entrypoint script
 
 ### "Web interface not loading"
 - **Solution**: Check if server is actually listening

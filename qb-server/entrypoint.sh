@@ -149,12 +149,25 @@ start_quickbuild() {
     # Change to QB home directory
     cd "$QB_HOME"
     
-    # Make sure the server script is executable
-    chmod +x "$QB_HOME/bin/server.sh"
+    # Start QuickBuild directly with Java to bypass wrapper license issues
+    echo "Starting QuickBuild directly with Java (bypassing wrapper license)..."
     
-    # Execute the real QuickBuild server startup script
-    echo "Starting QuickBuild using official server.sh script..."
-    exec "$QB_HOME/bin/server.sh" console
+    # Set up Java classpath for QuickBuild (include framework, plugins, and bootstrap directory)
+    export CLASSPATH="$QB_HOME/framework/*:$QB_HOME/plugins/*:$QB_HOME/plugins/com.pmease.quickbuild.bootstrap:$QB_HOME/lib/*"
+    
+    # Set QuickBuild system properties
+    JAVA_OPTS="-Xmx2048m -Xms1024m"
+    JAVA_OPTS="$JAVA_OPTS -Dqb.home=$QB_HOME"
+    JAVA_OPTS="$JAVA_OPTS -Dqb.data=$QB_DATA"
+    JAVA_OPTS="$JAVA_OPTS -Dqb.server.port=${QB_SERVER_PORT:-8810}"
+    JAVA_OPTS="$JAVA_OPTS -Djava.awt.headless=true"
+    
+    # Debug: Show what we're trying to run
+    echo "Java classpath: $CLASSPATH"
+    echo "Looking for Bootstrap class..."
+    
+    # Start QuickBuild main class directly
+    exec java $JAVA_OPTS -cp "$CLASSPATH" com.pmease.quickbuild.bootstrap.Bootstrap
 }
 
 # Function to display startup information
