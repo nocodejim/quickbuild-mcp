@@ -52,29 +52,34 @@ docker logs qb-database | tail -10
 
 ## Step 3: Create QuickBuild Database
 ```bash
-# Test SQL Server connectivity first
-docker exec qb-database /opt/mssql-tools/bin/sqlcmd \
+# Test SQL Server connectivity first (using newer sqlcmd with SSL bypass)
+docker exec qb-database /opt/mssql-tools18/bin/sqlcmd \
   -S localhost -U sa -P "TestPassword123!" \
+  -C \
   -Q "SELECT @@VERSION"
 
 # If the above works, create the QuickBuild database
-docker exec qb-database /opt/mssql-tools/bin/sqlcmd \
+docker exec qb-database /opt/mssql-tools18/bin/sqlcmd \
   -S localhost -U sa -P "TestPassword123!" \
+  -C \
   -Q "CREATE DATABASE quickbuild COLLATE SQL_Latin1_General_CP1_CI_AS;"
 
 # Create QuickBuild user
-docker exec qb-database /opt/mssql-tools/bin/sqlcmd \
+docker exec qb-database /opt/mssql-tools18/bin/sqlcmd \
   -S localhost -U sa -P "TestPassword123!" \
+  -C \
   -Q "CREATE LOGIN qb_user WITH PASSWORD = 'QBTestPassword123!';"
 
 # Grant permissions
-docker exec qb-database /opt/mssql-tools/bin/sqlcmd \
+docker exec qb-database /opt/mssql-tools18/bin/sqlcmd \
   -S localhost -U sa -P "TestPassword123!" \
+  -C \
   -Q "USE quickbuild; CREATE USER qb_user FOR LOGIN qb_user; ALTER ROLE db_owner ADD MEMBER qb_user;"
 
 # Verify database setup
-docker exec qb-database /opt/mssql-tools/bin/sqlcmd \
+docker exec qb-database /opt/mssql-tools18/bin/sqlcmd \
   -S localhost -U qb_user -P "QBTestPassword123!" \
+  -C \
   -Q "USE quickbuild; SELECT DB_NAME();"
 ```
 
@@ -149,8 +154,9 @@ docker exec qb-server ping qb-database
 docker logs qb-database
 
 # Test direct database connection
-docker exec qb-server /opt/mssql-tools/bin/sqlcmd \
+docker exec qb-server /opt/mssql-tools18/bin/sqlcmd \
   -S qb-database -U qb_user -P "QBTestPassword123!" \
+  -C \
   -Q "SELECT 1"
 ```
 
@@ -228,10 +234,17 @@ docker-compose up -d qb-server
 ### "SQL Server not ready"
 - **Solution**: Wait longer (SQL Server can take 2-3 minutes)
 - **Check**: `docker logs qb-database | grep "ready for client connections"`
+- **Note**: Modern SQL Server uses `/opt/mssql-tools18/bin/sqlcmd` and requires `-C` flag to bypass SSL certificate validation
 
 ### "Database connection failed"
 - **Solution**: Verify database setup in Step 3
 - **Check**: Test connection manually with sqlcmd
+- **SSL Error**: Use `-C` flag to bypass certificate validation: `sqlcmd -S localhost -U sa -P "password" -C -Q "SELECT 1"`
+
+### "sqlcmd not found" or "mssql-tools not found"
+- **Solution**: Modern SQL Server containers use `/opt/mssql-tools18/bin/sqlcmd`
+- **Check**: `docker exec qb-database ls -la /opt/mssql-tools18/bin/`
+- **Alternative**: Use `docker exec qb-database find /opt -name sqlcmd` to locate the correct path
 
 ### "QuickBuild won't start"
 - **Solution**: Check if QuickBuild files are properly copied
