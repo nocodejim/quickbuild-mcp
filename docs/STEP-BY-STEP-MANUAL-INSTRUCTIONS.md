@@ -1,5 +1,15 @@
 # QuickBuild 14 - Step-by-Step Manual Instructions
 
+## ⚠️ SAFETY FIRST - READ THIS
+**NEVER run destructive system-wide commands like:**
+- `docker system prune -f` (removes ALL unused Docker resources)
+- `docker volume prune -f` (removes ALL unused volumes)
+- `docker image prune -a -f` (removes ALL unused images)
+- `rm -rf /` or similar filesystem destructive commands
+- Any command that affects the entire Docker system or host filesystem
+
+**This guide only uses targeted, safe commands that affect specific QuickBuild containers.**
+
 ## Prerequisites
 - Docker and Docker Compose installed
 - At least 8GB RAM available
@@ -8,14 +18,17 @@
 
 ## Step 1: Clean Environment
 ```bash
-# Stop any existing containers
+# Stop any existing QuickBuild containers
 docker-compose down -v
 
-# Clean up Docker system
-docker system prune -f
+# Remove only QuickBuild-related containers (if they exist)
+docker rm -f qb-server qb-database 2>/dev/null || true
 
-# Verify clean state
-docker ps -a
+# Remove only QuickBuild-related networks (if they exist)
+docker network rm qb-network 2>/dev/null || true
+
+# Verify clean state (should show no QuickBuild containers)
+docker ps -a | grep -E "(qb-server|qb-database|quickbuild)"
 ```
 
 ## Step 2: Start Database (Simple Approach)
@@ -236,17 +249,19 @@ docker-compose up -d qb-server
 
 ## Clean Up (When Done Testing)
 ```bash
-# Stop all containers
+# Stop QuickBuild containers
 docker stop qb-server qb-database
 
-# Remove containers
+# Remove QuickBuild containers
 docker rm qb-server qb-database
 
-# Remove network
+# Remove QuickBuild network
 docker network rm qb-network
 
-# Remove images (optional)
-docker rmi quickbuild14-test-qb-server
+# Remove QuickBuild images (optional - only if you want to free space)
+docker rmi quickbuild14-test-qb-server mcr.microsoft.com/mssql/server:2022-latest
+
+# WARNING: Never run 'docker system prune -f' as it removes ALL unused Docker resources system-wide
 ```
 
 Follow these steps in order, and you should have a working QuickBuild 14 containerized environment!
