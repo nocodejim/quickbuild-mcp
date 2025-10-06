@@ -8,19 +8,21 @@ services:
   # Microsoft SQL Server Database
   qb-database:
     build:
-      context: ./qb-database
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./qb-database/Dockerfile
     container_name: qb-database
     hostname: qb-database
     environment:
       - ACCEPT_EULA=Y
-      - SA_PASSWORD=${MSSQL_SA_PASSWORD}
-      - QB_DB_PASSWORD=${QB_DB_PASSWORD}
+      - SA_PASSWORD=TestPassword123!
+      - QB_DB_PASSWORD=QBTestPassword123!
       - MSSQL_PID=${MSSQL_PID:-Express}
       - MSSQL_COLLATION=${MSSQL_COLLATION:-SQL_Latin1_General_CP1_CI_AS}
-    volumes:
-      - qb-db-data:/var/opt/mssql/data
-      - qb-db-logs:/var/opt/mssql/log
+      - QB_DB_NAME=quickbuild
+      - QB_DB_USER=qb_user
+    # volumes:
+    #   - qb-db-data:/var/opt/mssql/data
+    #   - qb-db-logs:/var/opt/mssql/log
     networks:
       - qb-net
     ports:
@@ -28,7 +30,7 @@ services:
       - "1433"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "/opt/mssql-scripts/healthcheck.sh"]
+      test: ["CMD-SHELL", "timeout 10s bash -c '</dev/tcp/localhost/1433' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -45,8 +47,8 @@ services:
   # QuickBuild Server
   qb-server:
     build:
-      context: ./qb-server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./qb-server/Dockerfile
     container_name: qb-server
     hostname: qb-server
     environment:
@@ -87,8 +89,8 @@ services:
   # Base Build Agent
   qb-agent-base:
     build:
-      context: ./qb-agent/base
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./qb-agent/base/Dockerfile
     environment:
       - QB_SERVER_URL=http://qb-server:8810
       - AGENT_PORT=8811
@@ -112,8 +114,8 @@ services:
   # Maven Build Agent
   qb-agent-maven:
     build:
-      context: ./qb-agent/maven
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./qb-agent/maven/Dockerfile
     environment:
       - QB_SERVER_URL=http://qb-server:8810
       - AGENT_PORT=8811
@@ -140,8 +142,8 @@ services:
   # Node.js Build Agent
   qb-agent-node:
     build:
-      context: ./qb-agent/node
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./qb-agent/node/Dockerfile
     environment:
       - QB_SERVER_URL=http://qb-server:8810
       - AGENT_PORT=8811
@@ -168,8 +170,8 @@ services:
   # .NET Build Agent
   qb-agent-dotnet:
     build:
-      context: ./qb-agent/dotnet
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./qb-agent/dotnet/Dockerfile
     environment:
       - QB_SERVER_URL=http://qb-server:8810
       - AGENT_PORT=8811

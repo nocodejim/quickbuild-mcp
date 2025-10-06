@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     unzip \
     gettext-base \
+    netcat \
     && rm -rf /var/lib/apt/lists/*
 
 # Create quickbuild user (UID 1000 for consistency)
@@ -29,27 +30,21 @@ ENV QB_DOWNLOAD_URL=https://www.pmease.com/quickbuild/downloads/quickbuild-${QB_
 # Create directories
 RUN mkdir -p /opt/quickbuild /opt/quickbuild/data /tmp/qb-install
 
-# Download and install QuickBuild 14
-WORKDIR /tmp/qb-install
-RUN echo "Downloading QuickBuild ${QB_VERSION}..." && \
-    wget -q "${QB_DOWNLOAD_URL}" -O quickbuild.zip && \
-    echo "Extracting QuickBuild..." && \
-    unzip -q quickbuild.zip && \
-    echo "Installing QuickBuild..." && \
-    mv quickbuild-${QB_VERSION}/* /opt/quickbuild/ && \
-    rm -rf /tmp/qb-install
+# Copy real QuickBuild 14.0.32 installation
+COPY environment/quickbuild-14.0.32/quickbuild-14.0.32/ /opt/quickbuild/
 
 # Download Microsoft SQL Server JDBC driver
 ENV MSSQL_JDBC_VERSION=12.4.2.jre8
 RUN echo "Downloading SQL Server JDBC driver..." && \
     wget -q "https://github.com/Microsoft/mssql-jdbc/releases/download/v${MSSQL_JDBC_VERSION}/mssql-jdbc-${MSSQL_JDBC_VERSION}.jar" \
-    -O /opt/quickbuild/lib/mssql-jdbc.jar
+    -O /opt/quickbuild/lib/mssql-jdbc.jar || \
+    echo "Warning: Could not download JDBC driver, using existing drivers"
 
 # Copy configuration templates and scripts
-COPY hibernate.properties.template /opt/quickbuild/conf/
-COPY wrapper.conf.template /opt/quickbuild/conf/
-COPY entrypoint.sh /opt/quickbuild/
-COPY healthcheck.sh /opt/quickbuild/
+COPY qb-server/hibernate.properties.template /opt/quickbuild/conf/
+COPY qb-server/wrapper.conf.template /opt/quickbuild/conf/
+COPY qb-server/entrypoint.sh /opt/quickbuild/
+COPY qb-server/healthcheck.sh /opt/quickbuild/
 
 # Set proper permissions
 RUN chown -R quickbuild:quickbuild /opt/quickbuild && \

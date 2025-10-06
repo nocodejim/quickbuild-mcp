@@ -1,5 +1,7 @@
-# Environment and specification files
-environment/
+# QuickBuild installations (keep our docs and specs)
+environment/quickbuild-*/
+qb-server/quickbuild-*/
+qb-agent/*/quickbuild-agent/
 
 # Python
 __pycache__/
@@ -82,3 +84,4 @@ logs/
 *.temp
 .DS_Store
 Thumbs.db
+*Zone.Identifier

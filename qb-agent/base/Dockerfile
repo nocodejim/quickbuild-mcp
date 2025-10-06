@@ -31,15 +31,8 @@ ENV QB_AGENT_DOWNLOAD_URL=https://www.pmease.com/quickbuild/downloads/quickbuild
 # Create directories
 RUN mkdir -p /opt/qb-agent /opt/qb-agent/conf /tmp/qb-install
 
-# Download and install QuickBuild 14 Agent
-WORKDIR /tmp/qb-install
-RUN echo "Downloading QuickBuild ${QB_VERSION}..." && \
-    wget -q "${QB_AGENT_DOWNLOAD_URL}" -O quickbuild.zip && \
-    echo "Extracting QuickBuild..." && \
-    unzip -q quickbuild.zip && \
-    echo "Installing QuickBuild Agent..." && \
-    cp -r quickbuild-${QB_VERSION}/agent/* /opt/qb-agent/ && \
-    rm -rf /tmp/qb-install
+# Copy real QuickBuild 14.0.32 agent installation
+COPY quickbuild-agent/ /opt/qb-agent/
 
 # Copy agent entrypoint script
 COPY agent-entrypoint.sh /opt/qb-agent/
@@ -47,7 +40,7 @@ COPY agent-entrypoint.sh /opt/qb-agent/
 # Set proper permissions
 RUN chown -R qbagent:qbagent /opt/qb-agent && \
     chmod +x /opt/qb-agent/agent-entrypoint.sh && \
-    chmod +x /opt/qb-agent/bin/agent.sh
+    chmod +x /opt/qb-agent/agent.sh 2>/dev/null || true
 
 # Set environment variables
 ENV QB_AGENT_HOME=/opt/qb-agent
@@ -64,7 +57,7 @@ EXPOSE 8811
 
 # Configure health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8811/health || pgrep -f "agent.sh" > /dev/null
+    CMD pgrep -f "agent.sh" > /dev/null || exit 1
 
 # Switch to qbagent user
 USER qbagent

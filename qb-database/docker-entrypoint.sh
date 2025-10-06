@@ -77,22 +77,12 @@ run_initialization() {
     return 0
 }
 
-# Function to start SQL Server in background
-start_sqlserver() {
-    echo "Starting SQL Server..."
-    
-    # Start SQL Server in background
-    /opt/mssql/bin/sqlservr &
-    SQLSERVER_PID=$!
-    
-    echo "SQL Server started with PID: $SQLSERVER_PID"
-    return 0
-}
-
 # Main execution flow
 main() {
-    # Start SQL Server
-    start_sqlserver
+    # Start SQL Server using the original entrypoint in background
+    echo "Starting SQL Server using original entrypoint..."
+    /opt/mssql/bin/launch_sqlservr.sh &
+    SQLSERVER_PID=$!
     
     # Wait for SQL Server to be ready
     if ! wait_for_sqlserver; then

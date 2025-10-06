@@ -10,20 +10,30 @@ ENV ACCEPT_EULA=Y
 ENV MSSQL_PID=Express
 ENV MSSQL_COLLATION=SQL_Latin1_General_CP1_CI_AS
 
+# Switch to root user to create directories and set permissions
+USER root
+
 # Create directory for initialization scripts
 RUN mkdir -p /opt/mssql-scripts
 
 # Copy initialization scripts
-COPY init-scripts/ /opt/mssql-scripts/
-COPY healthcheck.sh /opt/mssql-scripts/
+COPY qb-database/init-scripts/ /opt/mssql-scripts/
+COPY qb-database/healthcheck.sh /opt/mssql-scripts/
 
 # Set proper permissions for scripts
 RUN chmod +x /opt/mssql-scripts/*.sh
-RUN chmod 644 /opt/mssql-scripts/*.sql
+RUN chmod 644 /opt/mssql-scripts/*.sql 2>/dev/null || true
 
 # Create custom entrypoint script to run initialization
-COPY docker-entrypoint.sh /opt/mssql-scripts/
+COPY qb-database/docker-entrypoint.sh /opt/mssql-scripts/
 RUN chmod +x /opt/mssql-scripts/docker-entrypoint.sh
+
+# Ensure proper ownership of data directories
+RUN chown -R mssql:root /var/opt/mssql && \
+    chmod -R 755 /var/opt/mssql
+
+# Switch back to mssql user for security
+USER mssql
 
 # Expose SQL Server port (internal network only)
 EXPOSE 1433

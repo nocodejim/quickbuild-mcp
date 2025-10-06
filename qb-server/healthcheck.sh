@@ -21,18 +21,7 @@ check_server_health() {
         # Test basic HTTP connectivity
         if curl -f -s --max-time $TIMEOUT "http://localhost:${SERVER_PORT}/" > /dev/null 2>&1; then
             echo "✓ QuickBuild server is responding to HTTP requests"
-            
-            # Test REST API health endpoint (if available)
-            if curl -f -s --max-time $TIMEOUT "http://localhost:${SERVER_PORT}/rest/system/health" > /dev/null 2>&1; then
-                echo "✓ QuickBuild REST API is healthy"
-                echo "Server health check passed!"
-                return 0
-            else
-                echo "⚠ REST API health endpoint not available (server may still be starting)"
-                # Don't fail if just the health endpoint isn't ready yet
-                echo "Server health check passed (basic connectivity OK)!"
-                return 0
-            fi
+            return 0
         else
             echo "✗ QuickBuild server is not responding on port ${SERVER_PORT} (attempt $attempt)"
         fi
