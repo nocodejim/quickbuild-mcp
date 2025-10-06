@@ -1,0 +1,303 @@
+# QuickBuild 14 Build Agents Deployments
+# Scalable build agents for different toolchains
+
+---
+# Base Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qb-agent-base
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/variant: base
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickbuild
+      app.kubernetes.io/component: agent
+      app.kubernetes.io/variant: base
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quickbuild
+        app.kubernetes.io/component: agent
+        app.kubernetes.io/variant: base
+        app.kubernetes.io/part-of: quickbuild-containerization
+    spec:
+      serviceAccountName: quickbuild-agent
+      initContainers:
+      - name: wait-for-server
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "Waiting for QuickBuild server to be ready..."
+          until nc -z qb-server-service 8810; do
+            echo "Server not ready, waiting..."
+            sleep 10
+          done
+          echo "Server is ready!"
+      containers:
+      - name: qb-agent-base
+        image: qb-agent-base:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: QB_SERVER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: QB_SERVER_URL
+        - name: AGENT_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: AGENT_PORT
+        - name: AGENT_NAME
+          value: "base-agent-$(HOSTNAME)"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+
+---
+# Maven Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qb-agent-maven
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/variant: maven
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickbuild
+      app.kubernetes.io/component: agent
+      app.kubernetes.io/variant: maven
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quickbuild
+        app.kubernetes.io/component: agent
+        app.kubernetes.io/variant: maven
+        app.kubernetes.io/part-of: quickbuild-containerization
+    spec:
+      serviceAccountName: quickbuild-agent
+      initContainers:
+      - name: wait-for-server
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "Waiting for QuickBuild server to be ready..."
+          until nc -z qb-server-service 8810; do
+            echo "Server not ready, waiting..."
+            sleep 10
+          done
+          echo "Server is ready!"
+      containers:
+      - name: qb-agent-maven
+        image: qb-agent-maven:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: QB_SERVER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: QB_SERVER_URL
+        - name: AGENT_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: AGENT_PORT
+        - name: AGENT_NAME
+          value: "maven-agent-$(HOSTNAME)"
+        - name: MAVEN_OPTS
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: MAVEN_OPTS
+        volumeMounts:
+        - name: maven-cache
+          mountPath: /opt/qb-agent/.m2/repository
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "3Gi"
+            cpu: "2000m"
+      volumes:
+      - name: maven-cache
+        persistentVolumeClaim:
+          claimName: qb-maven-cache-pvc
+
+---
+# Node.js Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qb-agent-node
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/variant: node
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickbuild
+      app.kubernetes.io/component: agent
+      app.kubernetes.io/variant: node
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quickbuild
+        app.kubernetes.io/component: agent
+        app.kubernetes.io/variant: node
+        app.kubernetes.io/part-of: quickbuild-containerization
+    spec:
+      serviceAccountName: quickbuild-agent
+      initContainers:
+      - name: wait-for-server
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "Waiting for QuickBuild server to be ready..."
+          until nc -z qb-server-service 8810; do
+            echo "Server not ready, waiting..."
+            sleep 10
+          done
+          echo "Server is ready!"
+      containers:
+      - name: qb-agent-node
+        image: qb-agent-node:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: QB_SERVER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: QB_SERVER_URL
+        - name: AGENT_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: AGENT_PORT
+        - name: AGENT_NAME
+          value: "node-agent-$(HOSTNAME)"
+        volumeMounts:
+        - name: node-cache
+          mountPath: /opt/qb-agent/.npm
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "3Gi"
+            cpu: "2000m"
+      volumes:
+      - name: node-cache
+        persistentVolumeClaim:
+          claimName: qb-node-cache-pvc
+
+---
+# .NET Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qb-agent-dotnet
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/variant: dotnet
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickbuild
+      app.kubernetes.io/component: agent
+      app.kubernetes.io/variant: dotnet
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quickbuild
+        app.kubernetes.io/component: agent
+        app.kubernetes.io/variant: dotnet
+        app.kubernetes.io/part-of: quickbuild-containerization
+    spec:
+      serviceAccountName: quickbuild-agent
+      initContainers:
+      - name: wait-for-server
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "Waiting for QuickBuild server to be ready..."
+          until nc -z qb-server-service 8810; do
+            echo "Server not ready, waiting..."
+            sleep 10
+          done
+          echo "Server is ready!"
+      containers:
+      - name: qb-agent-dotnet
+        image: qb-agent-dotnet:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: QB_SERVER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: QB_SERVER_URL
+        - name: AGENT_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: AGENT_PORT
+        - name: AGENT_NAME
+          value: "dotnet-agent-$(HOSTNAME)"
+        - name: DOTNET_CLI_TELEMETRY_OPTOUT
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: DOTNET_CLI_TELEMETRY_OPTOUT
+        - name: DOTNET_SKIP_FIRST_TIME_EXPERIENCE
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: DOTNET_SKIP_FIRST_TIME_EXPERIENCE
+        - name: DOTNET_NOLOGO
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-agent-config
+              key: DOTNET_NOLOGO
+        volumeMounts:
+        - name: dotnet-cache
+          mountPath: /opt/qb-agent/.nuget/packages
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "3Gi"
+            cpu: "2000m"
+      volumes:
+      - name: dotnet-cache
+        persistentVolumeClaim:
+          claimName: qb-dotnet-cache-pvc

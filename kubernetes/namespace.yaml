@@ -1,0 +1,12 @@
+# QuickBuild 14 Kubernetes Namespace
+# Creates dedicated namespace for QuickBuild deployment with proper labeling
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quickbuild
+  labels:
+    name: quickbuild
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/version: "14.0"
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/part-of: quickbuild-containerization

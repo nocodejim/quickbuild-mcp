@@ -1,0 +1,82 @@
+# QuickBuild 14 Scaling Docker Compose Configuration
+# Provides advanced scaling capabilities for build agents
+# Use with docker-compose.yml as base configuration
+
+version: '3.8'
+
+services:
+  # Scalable Base Agents
+  qb-agent-base:
+    deploy:
+      mode: replicated
+      replicas: ${AGENT_BASE_REPLICAS:-2}
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
+      placement:
+        max_replicas_per_node: 2
+
+  # Scalable Maven Agents
+  qb-agent-maven:
+    deploy:
+      mode: replicated
+      replicas: ${AGENT_MAVEN_REPLICAS:-2}
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
+      placement:
+        max_replicas_per_node: 1
+        constraints:
+          - node.labels.agent-type!=memory-constrained
+
+  # Scalable Node.js Agents
+  qb-agent-node:
+    deploy:
+      mode: replicated
+      replicas: ${AGENT_NODE_REPLICAS:-2}
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
+      placement:
+        max_replicas_per_node: 2
+
+  # Scalable .NET Agents
+  qb-agent-dotnet:
+    deploy:
+      mode: replicated
+      replicas: ${AGENT_DOTNET_REPLICAS:-2}
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
+      placement:
+        max_replicas_per_node: 1
+        constraints:
+          - node.labels.agent-type!=memory-constrained

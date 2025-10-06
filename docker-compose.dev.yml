@@ -1,0 +1,103 @@
+# QuickBuild 14 Development Docker Compose Override
+# Extends docker-compose.yml with development-specific configurations
+# Includes debugging, volume mounts, and development conveniences
+
+version: '3.8'
+
+services:
+  # Database with development settings
+  qb-database:
+    environment:
+      - SA_PASSWORD=${MSSQL_SA_PASSWORD:-DevPassword123!}
+      - QB_DB_PASSWORD=${QB_DB_PASSWORD:-QBDevPassword123!}
+    ports:
+      # Expose database port for development access
+      - "1433:1433"
+    volumes:
+      # Add development scripts volume
+      - ./dev-scripts:/opt/dev-scripts:ro
+
+  # Server with development settings
+  qb-server:
+    environment:
+      - QB_DB_PASSWORD=${QB_DB_PASSWORD:-QBDevPassword123!}
+      - QB_LOG_LEVEL=DEBUG
+      - QB_DEBUG_MODE=true
+    ports:
+      # Expose additional ports for debugging
+      - "8810:8810"
+      - "5005:5005"  # JVM debug port
+    volumes:
+      # Mount source for live development
+      - ./qb-server/conf:/opt/quickbuild/conf:ro
+      - ./logs:/opt/quickbuild/data/logs
+
+  # Base agent with development settings
+  qb-agent-base:
+    environment:
+      - QB_LOG_LEVEL=DEBUG
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  # Maven agent with development settings
+  qb-agent-maven:
+    environment:
+      - MAVEN_OPTS=-Xmx512m -XX:MaxPermSize=128m
+      - QB_LOG_LEVEL=DEBUG
+    volumes:
+      # Mount local Maven repository for faster builds
+      - ~/.m2:/opt/qb-agent/.m2:cached
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  # Node.js agent with development settings
+  qb-agent-node:
+    environment:
+      - QB_LOG_LEVEL=DEBUG
+    volumes:
+      # Mount local npm cache
+      - ~/.npm:/opt/qb-agent/.npm:cached
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  # .NET agent with development settings
+  qb-agent-dotnet:
+    environment:
+      - QB_LOG_LEVEL=DEBUG
+    volumes:
+      # Mount local NuGet packages
+      - ~/.nuget:/opt/qb-agent/.nuget:cached
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+# Development-specific volumes
+volumes:
+  # Use local directories for easier access
+  qb-db-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./dev-data/db-data
+  qb-server-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./dev-data/server-data
