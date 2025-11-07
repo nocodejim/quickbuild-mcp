@@ -2,8 +2,6 @@
 # Extends docker-compose.yml with development-specific configurations
 # Includes debugging, volume mounts, and development conveniences
 
-version: '3.8'
-
 services:
   # Database with development settings
   qb-database:

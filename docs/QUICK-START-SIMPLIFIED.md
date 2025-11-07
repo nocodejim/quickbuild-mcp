@@ -47,8 +47,15 @@ sudo chmod +x /usr/local/bin/docker-compose
 git clone <your-repo>
 cd quickbuild-mcp
 
-# Quick test with simplified setup
-docker-compose -f docker-compose.simple.yml up -d
+# Configure environment
+cp .env.example .env
+# Edit .env with your passwords
+
+# Quick test with development setup
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# Check status
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps
 ```
 
 ### Option 3: Kubernetes Testing

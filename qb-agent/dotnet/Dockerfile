@@ -54,19 +54,8 @@ ENV DOTNET_CLI_HOME=/opt/qb-agent/.dotnet
 ENV NUGET_PACKAGES=/opt/qb-agent/.nuget/packages
 
 # Create NuGet configuration
-RUN mkdir -p /opt/qb-agent/.nuget && \
-    cat > /opt/qb-agent/.nuget/NuGet.Config << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
-  </packageSources>
-  <config>
-    <add key="globalPackagesFolder" value="/opt/qb-agent/.nuget/packages" />
-    <add key="repositoryPath" value="/opt/qb-agent/.nuget/packages" />
-  </config>
-</configuration>
-EOF
+RUN mkdir -p /opt/qb-agent/.nuget
+COPY --chown=qbagent:qbagent ./qb-agent/dotnet/config/NuGet.Config /opt/qb-agent/.nuget/NuGet.Config
 
 # Install common .NET tools
 RUN dotnet tool install --global dotnet-ef && \
@@ -86,36 +75,10 @@ RUN cd /tmp && \
     rm -rf /tmp/SampleApp
 
 # Create global.json for consistent SDK version
-RUN cat > /opt/qb-agent/global.json << 'EOF'
-{
-  "sdk": {
-    "version": "6.0.0",
-    "rollForward": "latestMinor"
-  }
-}
-EOF
+COPY --chown=qbagent:qbagent ./qb-agent/dotnet/config/global.json /opt/qb-agent/global.json
 
 # Create .NET-specific entrypoint script
-RUN cat > /opt/qb-agent/dotnet-entrypoint.sh << 'EOF'
-#!/bin/bash
-# .NET Agent Entrypoint - sets up .NET environment and starts agent
-
-# Display .NET information
-echo ".NET SDK Version: $(dotnet --version)"
-echo ".NET Runtime Versions:"
-dotnet --list-runtimes
-echo ".NET SDK Versions:"
-dotnet --list-sdks
-
-# Set up .NET environment
-export DOTNET_CLI_HOME=/opt/qb-agent/.dotnet
-export NUGET_PACKAGES=/opt/qb-agent/.nuget/packages
-
-# Call original agent entrypoint
-exec /opt/qb-agent/agent-entrypoint.sh "$@"
-EOF
-
-RUN chmod +x /opt/qb-agent/dotnet-entrypoint.sh
+COPY --chown=qbagent:qbagent --chmod=755 ./qb-agent/dotnet/config/dotnet-entrypoint.sh /opt/qb-agent/dotnet-entrypoint.sh
 
 # Verify .NET installation
 RUN dotnet --version && \

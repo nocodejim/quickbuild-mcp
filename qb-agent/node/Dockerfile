@@ -71,45 +71,14 @@ RUN bash -c "source $NVM_DIR/nvm.sh && \
     echo '✓ Global packages installed successfully'"
 
 # Create npm configuration for optimized builds
-RUN mkdir -p /opt/qb-agent/.npm && \
-    cat > /opt/qb-agent/.npmrc << 'EOF'
-# NPM Configuration for QuickBuild Agent
-cache=/opt/qb-agent/.npm
-prefix=/opt/qb-agent/.npm-global
-init-author-name=QuickBuild Agent
-init-license=MIT
-save-exact=true
-engine-strict=true
-fund=false
-audit-level=moderate
-EOF
+RUN mkdir -p /opt/qb-agent/.npm
+COPY --chown=qbagent:qbagent ./qb-agent/node/config/.npmrc /opt/qb-agent/.npmrc
 
 # Set up npm global directory
 ENV PATH=/opt/qb-agent/.npm-global/bin:$PATH
 
 # Create entrypoint script that sources NVM
-RUN cat > /opt/qb-agent/node-entrypoint.sh << 'EOF'
-#!/bin/bash
-# Node.js Agent Entrypoint - sources NVM and starts agent
-
-# Source NVM
-export NVM_DIR="/opt/qb-agent/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-
-# Use default Node version
-nvm use default
-
-# Display Node.js information
-echo "Node.js Version: $(node --version)"
-echo "NPM Version: $(npm --version)"
-echo "Yarn Version: $(yarn --version)"
-
-# Call original agent entrypoint
-exec /opt/qb-agent/agent-entrypoint.sh "$@"
-EOF
-
-RUN chmod +x /opt/qb-agent/node-entrypoint.sh
+COPY --chown=qbagent:qbagent --chmod=755 ./qb-agent/node/config/node-entrypoint.sh /opt/qb-agent/node-entrypoint.sh
 
 # Verify installations
 RUN bash -c "source $NVM_DIR/nvm.sh && \

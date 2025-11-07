@@ -35,48 +35,7 @@ RUN mkdir -p /opt/qb-agent/.m2 && \
     chown -R qbagent:qbagent /opt/qb-agent/.m2
 
 # Create Maven settings.xml with optimized configuration
-RUN mkdir -p /opt/qb-agent/.m2 && \
-    cat > /opt/qb-agent/.m2/settings.xml << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 
-                              http://maven.apache.org/xsd/settings-1.0.0.xsd">
-  
-  <!-- Local repository path -->
-  <localRepository>/opt/qb-agent/.m2/repository</localRepository>
-  
-  <!-- Offline mode -->
-  <offline>false</offline>
-  
-  <!-- Plugin groups -->
-  <pluginGroups>
-    <pluginGroup>org.apache.maven.plugins</pluginGroup>
-    <pluginGroup>org.codehaus.mojo</pluginGroup>
-  </pluginGroups>
-  
-  <!-- Profiles for different environments -->
-  <profiles>
-    <profile>
-      <id>quickbuild</id>
-      <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-      </properties>
-    </profile>
-  </profiles>
-  
-  <!-- Active profiles -->
-  <activeProfiles>
-    <activeProfile>quickbuild</activeProfile>
-  </activeProfiles>
-  
-</settings>
-EOF
-
-# Set proper ownership
-RUN chown -R qbagent:qbagent /opt/qb-agent/.m2
+COPY --chown=qbagent:qbagent ./qb-agent/maven/config/settings.xml /opt/qb-agent/.m2/settings.xml
 
 # Verify Maven installation
 RUN mvn --version

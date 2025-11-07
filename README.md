@@ -46,11 +46,14 @@ cp .env.example .env
 # Edit .env with your passwords (see Configuration section)
 ```
 
-### 2. Deploy with Docker Compose
+### 2. Choose Your Deployment Mode
 
+QuickBuild provides **4 docker-compose configurations** for different scenarios:
+
+#### **Option A: Development Mode** (Recommended for testing)
 ```bash
-# Start the complete stack
-docker-compose up -d
+# Start with development settings (debug enabled, exposed ports, local volumes)
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 # Verify deployment
 ./scripts/validate-deployment.sh -e docker-compose
@@ -58,6 +61,26 @@ docker-compose up -d
 # Monitor status
 ./scripts/monitor.sh -e docker-compose --once
 ```
+
+#### **Option B: Production Mode**
+```bash
+# Start with production settings (secrets, TLS, higher resources)
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+#### **Option C: Scaling Mode**
+```bash
+# Start with advanced scaling capabilities
+docker-compose -f docker-compose.yml -f docker-compose.scale.yml up -d
+```
+
+#### **Option D: Basic Mode** (Testing only)
+```bash
+# Start with base configuration only (not optimized)
+docker-compose up -d
+```
+
+> **💡 Tip:** For development, use **Option A**. For production deployments, use **Option B**.
 
 ### 3. Access QuickBuild
 
@@ -80,29 +103,43 @@ docker-compose up -d
 
 That's it! Your QuickBuild 14 environment is ready for use.
 
-### Prerequisites
+## 📊 Docker Compose Configurations Explained
 
-- Docker Engine 20.10+
-- Docker Compose 2.0+
-- 4GB+ available RAM
-- 20GB+ available disk space
+This project includes **4 docker-compose files** that can be combined for different deployment scenarios:
 
-### Basic Setup
+| File | Purpose | When to Use |
+|------|---------|-------------|
+| **docker-compose.yml** | Base configuration with all services | Always required (base layer) |
+| **docker-compose.dev.yml** | Development overrides | Local development and testing |
+| **docker-compose.prod.yml** | Production overrides | Production deployments |
+| **docker-compose.scale.yml** | Advanced scaling config | High-load environments |
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd quickbuild14-containerization
+### What Each Configuration Provides:
 
-# Copy environment template
-cp .env.example .env
+**Base (docker-compose.yml):**
+- All core services (database, server, agents)
+- Basic networking and volumes
+- Standard resource limits
 
-# Edit .env with your configuration
-# (Update passwords and settings)
+**Development (docker-compose.dev.yml):**
+- Exposed database port (1433) for debugging
+- JVM debug port (5005) for remote debugging
+- DEBUG log level
+- Lower resource limits (faster startup)
+- Local volume mounts for live development
 
-# Start the stack (when implementation complete)
-docker-compose up -d
-```
+**Production (docker-compose.prod.yml):**
+- Docker secrets for password management
+- TLS/SSL support
+- Higher resource limits and reservations
+- Production restart policies
+- External volume mounts for persistence
+
+**Scaling (docker-compose.scale.yml):**
+- Replicated agent deployment
+- Rolling update strategies
+- Node placement constraints
+- Advanced failure handling
 
 ## 📁 Project Structure
 
