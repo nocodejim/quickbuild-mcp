@@ -1,0 +1,56 @@
+# QuickBuild 14 Hibernate Configuration Template
+# Microsoft SQL Server Database Configuration
+# Environment variables will be substituted during container startup
+
+# Database connection settings
+hibernate.connection.driver_class=com.microsoft.sqlserver.jdbc.SQLServerDriver
+hibernate.dialect=org.hibernate.dialect.SQLServer2012Dialect
+hibernate.connection.url=jdbc:sqlserver://${QB_DB_HOST}:${QB_DB_PORT};databaseName=${QB_DB_NAME};encrypt=true;trustServerCertificate=true;loginTimeout=30
+hibernate.connection.username=${QB_DB_USER}
+hibernate.connection.password=${QB_DB_PASSWORD}
+
+# Connection pool settings (C3P0)
+hibernate.c3p0.max_size=20
+hibernate.c3p0.min_size=5
+hibernate.c3p0.timeout=300
+hibernate.c3p0.max_statements=50
+hibernate.c3p0.idle_test_period=3000
+hibernate.c3p0.acquire_increment=2
+hibernate.c3p0.acquire_retry_attempts=3
+hibernate.c3p0.acquire_retry_delay=1000
+hibernate.c3p0.break_after_acquire_failure=false
+hibernate.c3p0.test_connection_on_checkout=false
+hibernate.c3p0.test_connection_on_checkin=false
+hibernate.c3p0.preferred_test_query=SELECT 1
+
+# Hibernate behavior settings
+hibernate.hbm2ddl.auto=update
+hibernate.show_sql=false
+hibernate.format_sql=false
+hibernate.use_sql_comments=false
+hibernate.jdbc.batch_size=20
+hibernate.jdbc.fetch_size=100
+hibernate.max_fetch_depth=3
+hibernate.default_batch_fetch_size=16
+
+# Cache settings
+hibernate.cache.use_second_level_cache=true
+hibernate.cache.use_query_cache=true
+hibernate.cache.region.factory_class=org.hibernate.cache.ehcache.EhCacheRegionFactory
+
+# SQL Server specific settings
+hibernate.connection.isolation=2
+hibernate.jdbc.use_streams_for_binary=true
+hibernate.jdbc.use_get_generated_keys=true
+
+# Performance optimizations
+hibernate.order_inserts=true
+hibernate.order_updates=true
+hibernate.jdbc.batch_versioned_data=true
+
+# Transaction settings
+hibernate.transaction.factory_class=org.hibernate.transaction.JDBCTransactionFactory
+hibernate.current_session_context_class=thread
+
+# Schema validation (set to validate in production)
+hibernate.hbm2ddl.auto=update

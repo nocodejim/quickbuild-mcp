@@ -1,0 +1,116 @@
+# QuickBuild 14 Kubernetes Persistent Volume Claims
+# Storage definitions for database and server data persistence
+
+---
+# PVC for Database Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qb-database-data-pvc
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard  # Adjust based on your cluster's storage classes
+
+---
+# PVC for Database Logs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qb-database-logs-pvc
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+
+---
+# PVC for QuickBuild Server Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qb-server-data-pvc
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+
+---
+# PVC for Maven Cache (Shared across Maven agents)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qb-maven-cache-pvc
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  accessModes:
+    - ReadWriteMany  # Shared across multiple agent pods
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+
+---
+# PVC for Node.js Cache (Shared across Node agents)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qb-node-cache-pvc
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  accessModes:
+    - ReadWriteMany  # Shared across multiple agent pods
+  resources:
+    requests:
+      storage: 3Gi
+  storageClassName: standard
+
+---
+# PVC for .NET Packages Cache (Shared across .NET agents)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qb-dotnet-cache-pvc
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  accessModes:
+    - ReadWriteMany  # Shared across multiple agent pods
+  resources:
+    requests:
+      storage: 3Gi
+  storageClassName: standard

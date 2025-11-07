@@ -1,0 +1,81 @@
+# QuickBuild 14 Ingress
+# External access configuration for QuickBuild server
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quickbuild-ingress
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: quickbuild-containerization
+  annotations:
+    # Nginx ingress controller annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/client-max-body-size: "100m"
+    
+    # Session affinity for QuickBuild
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-name: "quickbuild-server"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "3600"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
+    
+    # Optional: Cert-manager for automatic TLS certificates
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  # TLS configuration
+  tls:
+  - hosts:
+    - quickbuild.example.com  # Replace with your domain
+    secretName: quickbuild-tls-secrets
+  
+  rules:
+  - host: quickbuild.example.com  # Replace with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: qb-server-service
+            port:
+              number: 8810
+
+---
+# Alternative Ingress for development/testing without TLS
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quickbuild-ingress-dev
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: quickbuild-containerization
+    app.kubernetes.io/environment: development
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "quickbuild-server-dev"
+spec:
+  rules:
+  - host: quickbuild-dev.local  # For local development
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: qb-server-service
+            port:
+              number: 8810

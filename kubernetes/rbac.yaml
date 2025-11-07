@@ -1,0 +1,85 @@
+# QuickBuild 14 Kubernetes RBAC Configuration
+# Service accounts, roles, and bindings for QuickBuild components
+
+---
+# Service Account for QuickBuild Server
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: quickbuild-server
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: quickbuild-containerization
+
+---
+# Service Account for QuickBuild Agents
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: quickbuild-agent
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: quickbuild-containerization
+
+---
+# Role for QuickBuild Server (minimal permissions)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: quickbuild-server-role
+  namespace: quickbuild
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Role for QuickBuild Agents (minimal permissions)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: quickbuild-agent-role
+  namespace: quickbuild
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+
+---
+# RoleBinding for QuickBuild Server
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: quickbuild-server-binding
+  namespace: quickbuild
+subjects:
+- kind: ServiceAccount
+  name: quickbuild-server
+  namespace: quickbuild
+roleRef:
+  kind: Role
+  name: quickbuild-server-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding for QuickBuild Agents
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: quickbuild-agent-binding
+  namespace: quickbuild
+subjects:
+- kind: ServiceAccount
+  name: quickbuild-agent
+  namespace: quickbuild
+roleRef:
+  kind: Role
+  name: quickbuild-agent-role
+  apiGroup: rbac.authorization.k8s.io

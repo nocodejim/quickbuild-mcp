@@ -1,0 +1,23 @@
+# QuickBuild 14 Database Service
+# Internal service for SQL Server database access
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: qb-database-service
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  type: ClusterIP  # Internal access only for security
+  ports:
+  - port: 1433
+    targetPort: 1433
+    protocol: TCP
+    name: mssql
+  selector:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: database
+  sessionAffinity: None

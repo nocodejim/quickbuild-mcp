@@ -1,0 +1,26 @@
+# QuickBuild 14 Server Service
+# Service for QuickBuild server access (internal and external)
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: qb-server-service
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8810
+    targetPort: 8810
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: server
+  sessionAffinity: ClientIP  # Maintain session affinity for QuickBuild
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600  # 1 hour session timeout

@@ -1,31 +1,238 @@
+# QuickBuild 14 Multi-Container Deployment with Microsoft SQL Server
+# Complete Docker Compose orchestration for development and small production deployments
+# Includes database, server, and scalable build agents
+
 version: '3.8'
 
 services:
-  mcp-quickbuild-server:
-    build: .
-    ports:
-      - "14002:14002"
-    environment:
-      - QB_URL=${QB_URL:-http://localhost:8810}
-      - QB_USER=${QB_USER:-admin}
-      - QB_PASSWORD=${QB_PASSWORD}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - MCP_PORT=${MCP_PORT:-14002}
-    restart: unless-stopped
-    volumes:
-      # Development volume mount - remove for production
-      - ./src:/usr/src/app/src
-
-  test:
+  # Microsoft SQL Server Database
+  qb-database:
     build:
       context: .
-      dockerfile: Dockerfile.test
+      dockerfile: ./qb-database/Dockerfile
+    container_name: qb-database
+    hostname: qb-database
     environment:
-      - QB_URL=http://mock-quickbuild:8810
-      - QB_USER=testuser
-      - QB_PASSWORD=testpass
-      - LOG_LEVEL=DEBUG
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=TestPassword123!
+      - QB_DB_PASSWORD=QBTestPassword123!
+      - MSSQL_PID=${MSSQL_PID:-Express}
+      - MSSQL_COLLATION=${MSSQL_COLLATION:-SQL_Latin1_General_CP1_CI_AS}
+      - QB_DB_NAME=quickbuild
+      - QB_DB_USER=qb_user
+    # volumes:
+    #   - qb-db-data:/var/opt/mssql/data
+    #   - qb-db-logs:/var/opt/mssql/log
+    networks:
+      - qb-net
+    ports:
+      # Database port not exposed externally for security
+      - "1433"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 10s bash -c '</dev/tcp/localhost/1433' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # QuickBuild Server
+  qb-server:
+    build:
+      context: .
+      dockerfile: ./qb-server/Dockerfile
+    container_name: qb-server
+    hostname: qb-server
+    environment:
+      - QB_DB_TYPE=mssql
+      - QB_DB_HOST=qb-database
+      - QB_DB_PORT=1433
+      - QB_DB_NAME=quickbuild
+      - QB_DB_USER=qb_user
+      - QB_DB_PASSWORD=${QB_DB_PASSWORD}
+      - QB_SERVER_URL=http://qb-server:8810
+      - QB_SERVER_PORT=${QB_SERVER_PORT:-8810}
+      - QB_LOG_LEVEL=${QB_LOG_LEVEL:-INFO}
     volumes:
-      - ./coverage:/coverage
-    profiles:
-      - test
+      - qb-server-data:/opt/quickbuild/data
+    networks:
+      - qb-net
+    ports:
+      - "${QB_SERVER_PORT:-8810}:8810"
+    depends_on:
+      qb-database:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/opt/quickbuild/healthcheck.sh"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # Base Build Agent
+  qb-agent-base:
+    build:
+      context: .
+      dockerfile: ./qb-agent/base/Dockerfile
+    environment:
+      - QB_SERVER_URL=http://qb-server:8810
+      - AGENT_PORT=8811
+      - AGENT_NAME=base-agent-${COMPOSE_PROJECT_NAME:-quickbuild14}
+    networks:
+      - qb-net
+    depends_on:
+      qb-server:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: ${AGENT_BASE_REPLICAS:-1}
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # Maven Build Agent
+  qb-agent-maven:
+    build:
+      context: .
+      dockerfile: ./qb-agent/maven/Dockerfile
+    environment:
+      - QB_SERVER_URL=http://qb-server:8810
+      - AGENT_PORT=8811
+      - AGENT_NAME=maven-agent-${COMPOSE_PROJECT_NAME:-quickbuild14}
+      - MAVEN_OPTS=-Xmx1024m -XX:MaxPermSize=256m
+    volumes:
+      - qb-maven-cache:/opt/qb-agent/.m2/repository
+    networks:
+      - qb-net
+    depends_on:
+      qb-server:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: ${AGENT_MAVEN_REPLICAS:-1}
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # Node.js Build Agent
+  qb-agent-node:
+    build:
+      context: .
+      dockerfile: ./qb-agent/node/Dockerfile
+    environment:
+      - QB_SERVER_URL=http://qb-server:8810
+      - AGENT_PORT=8811
+      - AGENT_NAME=node-agent-${COMPOSE_PROJECT_NAME:-quickbuild14}
+    volumes:
+      - qb-node-cache:/opt/qb-agent/.npm
+      - qb-node-global:/opt/qb-agent/.npm-global
+    networks:
+      - qb-net
+    depends_on:
+      qb-server:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: ${AGENT_NODE_REPLICAS:-1}
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # .NET Build Agent
+  qb-agent-dotnet:
+    build:
+      context: .
+      dockerfile: ./qb-agent/dotnet/Dockerfile
+    environment:
+      - QB_SERVER_URL=http://qb-server:8810
+      - AGENT_PORT=8811
+      - AGENT_NAME=dotnet-agent-${COMPOSE_PROJECT_NAME:-quickbuild14}
+      - DOTNET_CLI_TELEMETRY_OPTOUT=1
+      - DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+      - DOTNET_NOLOGO=1
+    volumes:
+      - qb-dotnet-packages:/opt/qb-agent/.nuget/packages
+    networks:
+      - qb-net
+    depends_on:
+      qb-server:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: ${AGENT_DOTNET_REPLICAS:-1}
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+# Named volumes for data persistence
+volumes:
+  # Database volumes
+  qb-db-data:
+    driver: local
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_db_data
+  qb-db-logs:
+    driver: local
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_db_logs
+  
+  # Server volume
+  qb-server-data:
+    driver: local
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_server_data
+  
+  # Agent cache volumes
+  qb-maven-cache:
+    driver: local
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_maven_cache
+  qb-node-cache:
+    driver: local
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_node_cache
+  qb-node-global:
+    driver: local
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_node_global
+  qb-dotnet-packages:
+    driver: local
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_dotnet_packages
+
+# Custom network for service communication
+networks:
+  qb-net:
+    driver: bridge
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_qb_net
+    ipam:
+      config:
+        - subnet: ${QB_NETWORK_SUBNET:-172.20.0.0/16}
+    driver_opts:
+      com.docker.network.bridge.name: qb-bridge

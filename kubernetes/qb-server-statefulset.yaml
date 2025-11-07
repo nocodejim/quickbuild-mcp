@@ -1,0 +1,131 @@
+# QuickBuild 14 Server StatefulSet
+# Provides persistent QuickBuild server service
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qb-server
+  namespace: quickbuild
+  labels:
+    app.kubernetes.io/name: quickbuild
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: quickbuild-containerization
+spec:
+  serviceName: qb-server-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: quickbuild
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quickbuild
+        app.kubernetes.io/component: server
+        app.kubernetes.io/part-of: quickbuild-containerization
+    spec:
+      serviceAccountName: quickbuild-server
+      initContainers:
+      - name: wait-for-database
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "Waiting for database to be ready..."
+          until nc -z qb-database-service 1433; do
+            echo "Database not ready, waiting..."
+            sleep 5
+          done
+          echo "Database is ready!"
+      containers:
+      - name: quickbuild-server
+        image: qb-server:latest  # Built from qb-server/Dockerfile
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8810
+          name: http
+        env:
+        - name: QB_DB_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-server-config
+              key: QB_DB_TYPE
+        - name: QB_DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-server-config
+              key: QB_DB_HOST
+        - name: QB_DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-server-config
+              key: QB_DB_PORT
+        - name: QB_DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-server-config
+              key: QB_DB_NAME
+        - name: QB_DB_USER
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-server-config
+              key: QB_DB_USER
+        - name: QB_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: quickbuild-database-secrets
+              key: QB_DB_PASSWORD
+        - name: QB_SERVER_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-server-config
+              key: QB_SERVER_PORT
+        - name: QB_SERVER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-server-config
+              key: QB_SERVER_URL
+        - name: QB_LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-server-config
+              key: QB_LOG_LEVEL
+        - name: JAVA_OPTS
+          valueFrom:
+            configMapKeyRef:
+              name: quickbuild-server-config
+              key: JAVA_OPTS
+        volumeMounts:
+        - name: qb-server-data
+          mountPath: /opt/quickbuild/data
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8810
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8810
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 3
+      volumes:
+      - name: qb-server-data
+        persistentVolumeClaim:
+          claimName: qb-server-data-pvc
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
