@@ -71,41 +71,14 @@ RUN bash -c "source $NVM_DIR/nvm.sh && \
     echo '✓ Global packages installed successfully'"
 
 # Create npm configuration for optimized builds
-RUN mkdir -p /opt/qb-agent/.npm && \
-    echo '# NPM Configuration for QuickBuild Agent' > /opt/qb-agent/.npmrc && \
-    echo 'cache=/opt/qb-agent/.npm' >> /opt/qb-agent/.npmrc && \
-    echo 'prefix=/opt/qb-agent/.npm-global' >> /opt/qb-agent/.npmrc && \
-    echo 'init-author-name=QuickBuild Agent' >> /opt/qb-agent/.npmrc && \
-    echo 'init-license=MIT' >> /opt/qb-agent/.npmrc && \
-    echo 'save-exact=true' >> /opt/qb-agent/.npmrc && \
-    echo 'engine-strict=true' >> /opt/qb-agent/.npmrc && \
-    echo 'fund=false' >> /opt/qb-agent/.npmrc && \
-    echo 'audit-level=moderate' >> /opt/qb-agent/.npmrc
+RUN mkdir -p /opt/qb-agent/.npm
+COPY --chown=qbagent:qbagent ./qb-agent/node/config/.npmrc /opt/qb-agent/.npmrc
 
 # Set up npm global directory
 ENV PATH=/opt/qb-agent/.npm-global/bin:$PATH
 
 # Create entrypoint script that sources NVM
-RUN echo '#!/bin/bash' > /opt/qb-agent/node-entrypoint.sh && \
-    echo '# Node.js Agent Entrypoint - sources NVM and starts agent' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo '' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo '# Source NVM' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo 'export NVM_DIR="/opt/qb-agent/.nvm"' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo '[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo '' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo '# Use default Node version' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo 'nvm use default' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo '' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo '# Display Node.js information' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo 'echo "Node.js Version: $(node --version)"' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo 'echo "NPM Version: $(npm --version)"' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo 'echo "Yarn Version: $(yarn --version)"' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo '' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo '# Call original agent entrypoint' >> /opt/qb-agent/node-entrypoint.sh && \
-    echo 'exec /opt/qb-agent/agent-entrypoint.sh "$@"' >> /opt/qb-agent/node-entrypoint.sh
-
-RUN chmod +x /opt/qb-agent/node-entrypoint.sh
+COPY --chown=qbagent:qbagent --chmod=755 ./qb-agent/node/config/node-entrypoint.sh /opt/qb-agent/node-entrypoint.sh
 
 # Verify installations
 RUN bash -c "source $NVM_DIR/nvm.sh && \
