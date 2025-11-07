@@ -36,44 +36,42 @@ RUN mkdir -p /opt/qb-agent/.m2 && \
 
 # Create Maven settings.xml with optimized configuration
 RUN mkdir -p /opt/qb-agent/.m2 && \
-    cat > /opt/qb-agent/.m2/settings.xml << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 
-                              http://maven.apache.org/xsd/settings-1.0.0.xsd">
-  
-  <!-- Local repository path -->
-  <localRepository>/opt/qb-agent/.m2/repository</localRepository>
-  
-  <!-- Offline mode -->
-  <offline>false</offline>
-  
-  <!-- Plugin groups -->
-  <pluginGroups>
-    <pluginGroup>org.apache.maven.plugins</pluginGroup>
-    <pluginGroup>org.codehaus.mojo</pluginGroup>
-  </pluginGroups>
-  
-  <!-- Profiles for different environments -->
-  <profiles>
-    <profile>
-      <id>quickbuild</id>
-      <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-      </properties>
-    </profile>
-  </profiles>
-  
-  <!-- Active profiles -->
-  <activeProfiles>
-    <activeProfile>quickbuild</activeProfile>
-  </activeProfiles>
-  
-</settings>
-EOF
+    echo '<?xml version="1.0" encoding="UTF-8"?>' > /opt/qb-agent/.m2/settings.xml && \
+    echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '                              http://maven.apache.org/xsd/settings-1.0.0.xsd">' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  ' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  <!-- Local repository path -->' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  <localRepository>/opt/qb-agent/.m2/repository</localRepository>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  ' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  <!-- Offline mode -->' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  <offline>false</offline>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  ' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  <!-- Plugin groups -->' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  <pluginGroups>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '    <pluginGroup>org.apache.maven.plugins</pluginGroup>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '    <pluginGroup>org.codehaus.mojo</pluginGroup>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  </pluginGroups>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  ' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  <!-- Profiles for different environments -->' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  <profiles>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '    <profile>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '      <id>quickbuild</id>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '      <properties>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '        <maven.compiler.source>8</maven.compiler.source>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '        <maven.compiler.target>8</maven.compiler.target>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '      </properties>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '    </profile>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  </profiles>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  ' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  <!-- Active profiles -->' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  <activeProfiles>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '    <activeProfile>quickbuild</activeProfile>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  </activeProfiles>' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '  ' >> /opt/qb-agent/.m2/settings.xml && \
+    echo '</settings>' >> /opt/qb-agent/.m2/settings.xml
 
 # Set proper ownership
 RUN chown -R qbagent:qbagent /opt/qb-agent/.m2

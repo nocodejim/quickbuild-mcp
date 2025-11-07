@@ -2,8 +2,6 @@
 # Complete Docker Compose orchestration for development and small production deployments
 # Includes database, server, and scalable build agents
 
-version: '3.8'
-
 services:
   # Microsoft SQL Server Database
   qb-database:

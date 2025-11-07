@@ -55,18 +55,16 @@ ENV NUGET_PACKAGES=/opt/qb-agent/.nuget/packages
 
 # Create NuGet configuration
 RUN mkdir -p /opt/qb-agent/.nuget && \
-    cat > /opt/qb-agent/.nuget/NuGet.Config << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
-  </packageSources>
-  <config>
-    <add key="globalPackagesFolder" value="/opt/qb-agent/.nuget/packages" />
-    <add key="repositoryPath" value="/opt/qb-agent/.nuget/packages" />
-  </config>
-</configuration>
-EOF
+    echo '<?xml version="1.0" encoding="utf-8"?>' > /opt/qb-agent/.nuget/NuGet.Config && \
+    echo '<configuration>' >> /opt/qb-agent/.nuget/NuGet.Config && \
+    echo '  <packageSources>' >> /opt/qb-agent/.nuget/NuGet.Config && \
+    echo '    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />' >> /opt/qb-agent/.nuget/NuGet.Config && \
+    echo '  </packageSources>' >> /opt/qb-agent/.nuget/NuGet.Config && \
+    echo '  <config>' >> /opt/qb-agent/.nuget/NuGet.Config && \
+    echo '    <add key="globalPackagesFolder" value="/opt/qb-agent/.nuget/packages" />' >> /opt/qb-agent/.nuget/NuGet.Config && \
+    echo '    <add key="repositoryPath" value="/opt/qb-agent/.nuget/packages" />' >> /opt/qb-agent/.nuget/NuGet.Config && \
+    echo '  </config>' >> /opt/qb-agent/.nuget/NuGet.Config && \
+    echo '</configuration>' >> /opt/qb-agent/.nuget/NuGet.Config
 
 # Install common .NET tools
 RUN dotnet tool install --global dotnet-ef && \
@@ -86,34 +84,30 @@ RUN cd /tmp && \
     rm -rf /tmp/SampleApp
 
 # Create global.json for consistent SDK version
-RUN cat > /opt/qb-agent/global.json << 'EOF'
-{
-  "sdk": {
-    "version": "6.0.0",
-    "rollForward": "latestMinor"
-  }
-}
-EOF
+RUN echo '{' > /opt/qb-agent/global.json && \
+    echo '  "sdk": {' >> /opt/qb-agent/global.json && \
+    echo '    "version": "6.0.0",' >> /opt/qb-agent/global.json && \
+    echo '    "rollForward": "latestMinor"' >> /opt/qb-agent/global.json && \
+    echo '  }' >> /opt/qb-agent/global.json && \
+    echo '}' >> /opt/qb-agent/global.json
 
 # Create .NET-specific entrypoint script
-RUN cat > /opt/qb-agent/dotnet-entrypoint.sh << 'EOF'
-#!/bin/bash
-# .NET Agent Entrypoint - sets up .NET environment and starts agent
-
-# Display .NET information
-echo ".NET SDK Version: $(dotnet --version)"
-echo ".NET Runtime Versions:"
-dotnet --list-runtimes
-echo ".NET SDK Versions:"
-dotnet --list-sdks
-
-# Set up .NET environment
-export DOTNET_CLI_HOME=/opt/qb-agent/.dotnet
-export NUGET_PACKAGES=/opt/qb-agent/.nuget/packages
-
-# Call original agent entrypoint
-exec /opt/qb-agent/agent-entrypoint.sh "$@"
-EOF
+RUN echo '#!/bin/bash' > /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo '# .NET Agent Entrypoint - sets up .NET environment and starts agent' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo '' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo '# Display .NET information' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo 'echo ".NET SDK Version: $(dotnet --version)"' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo 'echo ".NET Runtime Versions:"' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo 'dotnet --list-runtimes' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo 'echo ".NET SDK Versions:"' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo 'dotnet --list-sdks' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo '' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo '# Set up .NET environment' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo 'export DOTNET_CLI_HOME=/opt/qb-agent/.dotnet' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo 'export NUGET_PACKAGES=/opt/qb-agent/.nuget/packages' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo '' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo '# Call original agent entrypoint' >> /opt/qb-agent/dotnet-entrypoint.sh && \
+    echo 'exec /opt/qb-agent/agent-entrypoint.sh "$@"' >> /opt/qb-agent/dotnet-entrypoint.sh
 
 RUN chmod +x /opt/qb-agent/dotnet-entrypoint.sh
 

@@ -2,8 +2,6 @@
 # Extends docker-compose.yml with production-specific configurations
 # Includes secrets management, resource limits, and security enhancements
 
-version: '3.8'
-
 services:
   # Database with secrets and production settings
   qb-database:
