@@ -9,6 +9,17 @@ set -e
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.scale.yml"
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-quickbuild14}"
 
+run_compose() {
+    if docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    else
+        echo -e "${RED}Error: Neither 'docker compose' nor 'docker-compose' is available${NC}" >&2
+        exit 1
+    fi
+}
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -45,8 +56,8 @@ usage() {
 # Function to get current replica count
 get_replica_count() {
     local service="qb-agent-$1"
-    docker-compose $COMPOSE_FILES ps --services | grep -q "$service" || return 0
-    docker-compose $COMPOSE_FILES ps "$service" 2>/dev/null | grep -c "$service" || echo "0"
+    run_compose $COMPOSE_FILES ps --services | grep -q "$service" || return 0
+    run_compose $COMPOSE_FILES ps "$service" 2>/dev/null | grep -c "$service" || echo "0"
 }
 
 # Function to scale specific agent type
@@ -79,7 +90,7 @@ scale_agent_type() {
         fi
     fi
     
-    docker-compose $COMPOSE_FILES up -d --scale "$service=$count" "$service"
+    run_compose $COMPOSE_FILES up -d --scale "$service=$count" "$service"
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ Successfully scaled $agent_type agents to $count${NC}"
@@ -112,6 +123,8 @@ scale_all_agents() {
             if [ $new_count -lt 0 ]; then
                 new_count=0
             fi
+        elif [ "$operation" = "set" ]; then
+            new_count="$count"
         else
             echo -e "${RED}Error: Invalid operation $operation${NC}"
             return 1
@@ -151,7 +164,7 @@ show_status() {
     if command -v docker > /dev/null 2>&1; then
         echo "Resource Usage:"
         docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" \
-            $(docker-compose $COMPOSE_FILES ps -q) 2>/dev/null | grep qb-agent || true
+            $(run_compose $COMPOSE_FILES ps -q) 2>/dev/null | grep qb-agent || true
     fi
 }
 
@@ -163,7 +176,7 @@ auto_scale() {
     # QuickBuild's API to get actual build queue metrics
     
     local queue_length=$(curl -s "http://localhost:8810/rest/builds/queue" 2>/dev/null | jq length 2>/dev/null || echo "0")
-    local total_agents=$(docker-compose $COMPOSE_FILES ps -q | grep qb-agent | wc -l)
+    local total_agents=$(run_compose $COMPOSE_FILES ps -q | wc -l)
     
     echo "Build queue length: $queue_length"
     echo "Current agents: $total_agents"

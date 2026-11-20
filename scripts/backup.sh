@@ -36,6 +36,17 @@ warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+run_compose() {
+    if docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    else
+        error "Neither 'docker compose' nor 'docker-compose' is available"
+        exit 1
+    fi
+}
+
 # Usage function
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -125,7 +136,7 @@ backup_docker_compose() {
     log "Backing up Docker Compose deployment..."
     
     # Check if containers are running
-    if ! docker-compose -p "$COMPOSE_PROJECT" ps | grep -q "Up"; then
+    if ! run_compose -p "$COMPOSE_PROJECT" ps | grep -q "Up"; then
         warning "No running containers found for project $COMPOSE_PROJECT"
     fi
     

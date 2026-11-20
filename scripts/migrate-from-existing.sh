@@ -60,6 +60,7 @@ ENVIRONMENT=""
 NAMESPACE="quickbuild"
 COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME:-quickbuild14}"
 DRY_RUN=false
+MIGRATION_DIR="$PROJECT_ROOT/migration_$(date +%Y%m%d_%H%M%S)"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -212,13 +213,11 @@ analyze_configuration() {
 create_migration_plan() {
     log "Creating migration plan..."
     
-    local migration_dir="$PROJECT_ROOT/migration_$(date +%Y%m%d_%H%M%S)"
-    
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "[DRY RUN] Would create migration directory: $migration_dir"
+        log "[DRY RUN] Would create migration directory: $MIGRATION_DIR"
     else
-        mkdir -p "$migration_dir"/{config,data,database}
-        log "Created migration directory: $migration_dir"
+        mkdir -p "$MIGRATION_DIR"/{config,data,database}
+        log "Created migration directory: $MIGRATION_DIR"
     fi
     
     # Plan configuration migration
@@ -227,7 +226,7 @@ create_migration_plan() {
         if [[ "$DRY_RUN" == "true" ]]; then
             log "[DRY RUN] Would copy hibernate.properties for analysis"
         else
-            cp "$SOURCE_PATH/conf/hibernate.properties" "$migration_dir/config/"
+            cp "$SOURCE_PATH/conf/hibernate.properties" "$MIGRATION_DIR/config/"
             log "Copied hibernate.properties for analysis"
         fi
     fi
@@ -236,7 +235,7 @@ create_migration_plan() {
         if [[ "$DRY_RUN" == "true" ]]; then
             log "[DRY RUN] Would copy wrapper.conf for analysis"
         else
-            cp "$SOURCE_PATH/conf/wrapper.conf" "$migration_dir/config/"
+            cp "$SOURCE_PATH/conf/wrapper.conf" "$MIGRATION_DIR/config/"
             log "Copied wrapper.conf for analysis"
         fi
     fi
@@ -249,7 +248,7 @@ create_migration_plan() {
                 log "[DRY RUN] Would migrate $dir directory"
             else
                 log "Copying $dir directory..."
-                cp -r "$SOURCE_PATH/$dir" "$migration_dir/data/"
+                cp -r "$SOURCE_PATH/$dir" "$MIGRATION_DIR/data/"
                 success "$dir directory copied"
             fi
         fi
@@ -257,7 +256,7 @@ create_migration_plan() {
     
     # Create migration instructions
     if [[ "$DRY_RUN" != "true" ]]; then
-        cat > "$migration_dir/MIGRATION_INSTRUCTIONS.md" << 'EOF'
+        cat > "$MIGRATION_DIR/MIGRATION_INSTRUCTIONS.md" << 'EOF'
 # QuickBuild Migration Instructions
 
 This directory contains the migrated data from your existing QuickBuild installation.
@@ -292,11 +291,11 @@ If you have a database backup:
 - Database schema updates may be needed for version compatibility
 EOF
         
-        success "Migration instructions created: $migration_dir/MIGRATION_INSTRUCTIONS.md"
+        success "Migration instructions created: $MIGRATION_DIR/MIGRATION_INSTRUCTIONS.md"
     fi
     
     if [[ "$DRY_RUN" != "true" ]]; then
-        success "Migration preparation completed: $migration_dir"
+        success "Migration preparation completed: $MIGRATION_DIR"
         log "Next steps:"
         log "1. Review the migration directory contents"
         log "2. Follow the instructions in MIGRATION_INSTRUCTIONS.md"
@@ -339,11 +338,11 @@ migrate_database() {
         
         if [[ "$DRY_RUN" != "true" ]]; then
             # Copy database backup to migration directory
-            cp "$DATABASE_BACKUP" "$migration_dir/database/"
+            cp "$DATABASE_BACKUP" "$MIGRATION_DIR/database/"
             success "Database backup copied to migration directory"
             
             # Create database migration instructions
-            cat >> "$migration_dir/MIGRATION_INSTRUCTIONS.md" << EOF
+            cat >> "$MIGRATION_DIR/MIGRATION_INSTRUCTIONS.md" << EOF
 
 ## Database Migration Details
 
@@ -380,8 +379,8 @@ main() {
     
     detect_quickbuild_installation
     analyze_configuration
-    migrate_database
     create_migration_plan
+    migrate_database
     
     if [[ "$DRY_RUN" == "true" ]]; then
         success "Migration analysis completed (dry run)"

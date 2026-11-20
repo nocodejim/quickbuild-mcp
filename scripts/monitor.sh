@@ -52,6 +52,17 @@ alert() {
     echo "[ALERT] $1" >> "$LOG_FILE"
 }
 
+run_compose() {
+    if docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    else
+        error "Neither 'docker compose' nor 'docker-compose' is available"
+        return 1
+    fi
+}
+
 # Usage function
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -137,7 +148,7 @@ done
 
 # Auto-detect environment if not specified
 if [[ -z "$ENVIRONMENT" ]]; then
-    if command -v docker-compose >/dev/null 2>&1 && [[ -f "$PROJECT_ROOT/docker-compose.yml" ]]; then
+    if (docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1) && [[ -f "$PROJECT_ROOT/docker-compose.yml" ]]; then
         ENVIRONMENT="docker-compose"
     elif command -v kubectl >/dev/null 2>&1; then
         ENVIRONMENT="kubernetes"
@@ -194,7 +205,7 @@ monitor_docker_compose() {
     
     # Container status
     echo -e "${BLUE}Container Status:${NC}"
-    local containers=$(docker-compose -p "$COMPOSE_PROJECT" ps 2>/dev/null || echo "")
+    local containers=$(run_compose -p "$COMPOSE_PROJECT" ps 2>/dev/null || echo "")
     if [[ -n "$containers" ]]; then
         echo "$containers"
     else
@@ -204,7 +215,7 @@ monitor_docker_compose() {
     
     # Resource usage
     echo -e "${BLUE}Resource Usage:${NC}"
-    local container_ids=$(docker-compose -p "$COMPOSE_PROJECT" ps -q 2>/dev/null)
+    local container_ids=$(run_compose -p "$COMPOSE_PROJECT" ps -q 2>/dev/null)
     if [[ -n "$container_ids" ]]; then
         docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}" $container_ids 2>/dev/null || echo "Resource stats unavailable"
         
@@ -361,7 +372,7 @@ show_detailed_status() {
             docker system df 2>/dev/null || echo "Docker system info unavailable"
             echo ""
             echo "Container logs (last 10 lines):"
-            docker-compose -p "$COMPOSE_PROJECT" logs --tail=10 2>/dev/null || echo "Logs unavailable"
+            run_compose -p "$COMPOSE_PROJECT" logs --tail=10 2>/dev/null || echo "Logs unavailable"
             ;;
         "kubernetes")
             echo "Cluster info:"

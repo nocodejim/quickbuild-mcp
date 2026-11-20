@@ -90,6 +90,13 @@ class TestQuickBuildClientAuthentication:
         with patch.object(client.client, 'post', side_effect=httpx.ConnectError("Connection failed")):
             with pytest.raises(QuickBuildUnavailableError):
                 await client.authenticate()
+
+    @pytest.mark.asyncio
+    async def test_authentication_timeout_error(self, client):
+        """Test authentication with timeout error"""
+        with patch.object(client.client, 'post', side_effect=httpx.TimeoutException("Request timed out")):
+            with pytest.raises(QuickBuildUnavailableError):
+                await client.authenticate()
     
     @pytest.mark.asyncio
     async def test_authentication_unexpected_error(self, client):
@@ -143,6 +150,17 @@ class TestQuickBuildClientRequests:
                 assert result == {"result": "success"}
     
     @pytest.mark.asyncio
+    async def test_make_request_401_exhausted(self, authenticated_client):
+        """Test request with persistent 401 raises AuthenticationError after retries"""
+        mock_401_response = MagicMock()
+        mock_401_response.status_code = 401
+
+        with patch.object(authenticated_client.client, 'request', return_value=mock_401_response):
+            with patch.object(authenticated_client, 'authenticate', return_value=True):
+                with pytest.raises(AuthenticationError):
+                    await authenticated_client._make_request("GET", "test")
+
+    @pytest.mark.asyncio
     async def test_make_request_404_error(self, authenticated_client):
         """Test request with 404 error"""
         mock_response = MagicMock()
@@ -168,6 +186,26 @@ class TestQuickBuildClientRequests:
         with patch.object(authenticated_client.client, 'request', side_effect=httpx.ConnectError("Connection failed")):
             with pytest.raises(QuickBuildUnavailableError):
                 await authenticated_client._make_request("GET", "test")
+
+    @pytest.mark.asyncio
+    async def test_make_request_timeout_error_retry(self, authenticated_client):
+        """Test request with timeout error and retry"""
+        with patch.object(authenticated_client.client, 'request', side_effect=httpx.TimeoutException("Timed out")):
+            with pytest.raises(QuickBuildUnavailableError):
+                await authenticated_client._make_request("GET", "test")
+
+    @pytest.mark.asyncio
+    async def test_make_request_plain_text_response(self, authenticated_client):
+        """Test request handles non-JSON plain text response gracefully"""
+        mock_text_response = MagicMock()
+        mock_text_response.status_code = 200
+        mock_text_response.content = b"14.0.32"
+        mock_text_response.text = "14.0.32"
+        mock_text_response.json.side_effect = ValueError("Not JSON")
+
+        with patch.object(authenticated_client.client, 'request', return_value=mock_text_response):
+            result = await authenticated_client._make_request("GET", "version")
+            assert result == {"raw": "14.0.32"}
 
 
 class TestQuickBuildClientMethods:
@@ -324,3 +362,66 @@ class TestQuickBuildClientMethods:
         with patch.object(authenticated_client.client, 'aclose') as mock_close:
             await authenticated_client.close()
             mock_close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_empty_responses_return_empty_lists(self, authenticated_client):
+        """Test empty dict or list responses return empty lists cleanly"""
+        with patch.object(authenticated_client, 'get', return_value={}):
+            assert await authenticated_client.get_configurations() == []
+            assert await authenticated_client.get_agents() == []
+            assert await authenticated_client.get_build_changes("123") == []
+
+    @pytest.mark.asyncio
+    async def test_ttl_caching_and_clear_cache(self, authenticated_client):
+        """Test TTL caching for configurations and agents and manual cache clearing"""
+        mock_configs = [{"id": "1", "name": "Build", "description": "", "parentId": None, "enabled": True}]
+        with patch.object(authenticated_client, 'get', return_value=mock_configs) as mock_get:
+            first = await authenticated_client.get_configurations()
+            second = await authenticated_client.get_configurations()
+            assert len(first) == 1
+            assert first == second
+            mock_get.assert_called_once()
+
+            authenticated_client.clear_cache("configurations")
+            await authenticated_client.get_configurations()
+            assert mock_get.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_get_version(self, authenticated_client):
+        """Test retrieving QuickBuild version"""
+        with patch.object(authenticated_client, 'get', return_value={"raw": "14.0.32"}):
+            version_info = await authenticated_client.get_version()
+            assert version_info["version"] == "14.0.32"
+
+    @pytest.mark.asyncio
+    async def test_backup_database(self, authenticated_client):
+        """Test initiating database backup"""
+        with patch.object(authenticated_client, 'post', return_value={"raw": "/backups/qb.zip"}) as mock_post:
+            result = await authenticated_client.backup_database("/backups/qb.zip")
+            assert result["status"] == "initiated"
+            assert result["backup_path"] == "/backups/qb.zip"
+            assert result["details"] == "/backups/qb.zip"
+            mock_post.assert_called_once_with("backup", {"backupPath": "/backups/qb.zip"})
+
+    @pytest.mark.asyncio
+    async def test_async_context_manager(self):
+        """Test async context manager closes client on exit"""
+        with patch.dict(os.environ, {"QB_PASSWORD": "testpass"}):
+            with patch.object(httpx.AsyncClient, 'aclose', new_callable=AsyncMock) as mock_close:
+                async with QuickBuildClient():
+                    pass
+                mock_close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_ttl_cache_expiration(self):
+        """Test expired cache entry triggers fresh API fetch"""
+        with patch.dict(os.environ, {"QB_PASSWORD": "testpass"}):
+            client = QuickBuildClient(cache_ttl_configs=1, cache_ttl_agents=1)
+            client.authenticated = True
+            mock_configs = [{"id": "1", "name": "Build", "description": "", "parentId": None, "enabled": True}]
+            with patch.object(client, 'get', return_value=mock_configs) as mock_get:
+                with patch('src.quickbuild_client.time.monotonic', side_effect=[100.0, 102.0, 102.0]):
+                    await client.get_configurations()
+                    await client.get_configurations()
+                    assert mock_get.call_count == 2
+            await client.close()

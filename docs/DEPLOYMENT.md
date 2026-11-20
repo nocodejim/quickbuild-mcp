@@ -42,6 +42,15 @@ This guide provides detailed deployment procedures for QuickBuild 14 containeriz
 
 ## Docker Compose Deployment
 
+This project includes **4 docker-compose configurations** that work together:
+
+| File | Purpose | Usage |
+|------|---------|-------|
+| `docker-compose.yml` | Base configuration | **Always required** |
+| `docker-compose.dev.yml` | Development overrides | Use with base for dev |
+| `docker-compose.prod.yml` | Production overrides | Use with base for prod |
+| `docker-compose.scale.yml` | Scaling configuration | Use with base for scaling |
+
 ### Development Environment
 
 Perfect for development, testing, and small teams.
@@ -73,12 +82,19 @@ QB_SERVER_PORT=8810
 
 #### 3. Deploy Development Stack
 
+**Development mode** includes:
+- Database port exposed on 1433 (for external DB tools)
+- JVM debug port on 5005 (for remote debugging)
+- DEBUG log levels
+- Lower resource limits for faster startup
+- Local directory volume mounts
+
 ```bash
 # Start with development configuration
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 # Check status
-docker-compose ps
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps
 ```
 
 #### 4. Validate Deployment
@@ -94,6 +110,14 @@ curl -f http://localhost:8810
 ### Production Environment
 
 For production deployments with enhanced security and performance.
+
+**Production mode** includes:
+- Docker secrets for password management (no plaintext passwords)
+- TLS/SSL certificate support
+- Higher resource limits and reservations
+- Production-grade restart policies
+- External volume mounts for data persistence
+- Multiple agent replicas by default
 
 #### 1. Create Secrets
 
@@ -128,9 +152,49 @@ QB_LOG_LEVEL=WARN
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 # Verify all services are healthy
-docker-compose ps
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml ps
 ./scripts/validate-deployment.sh -e docker-compose
 ```
+
+### Scaling Environment
+
+For high-load environments requiring advanced scaling capabilities.
+
+**Scaling mode** includes:
+- Replicated deployment mode for all agents
+- Rolling update strategies (zero-downtime updates)
+- Intelligent failure handling and rollback
+- Node placement constraints
+- Per-node replica limits
+
+#### Deploy with Scaling
+
+```bash
+# Set replica counts in .env
+export AGENT_MAVEN_REPLICAS=3
+export AGENT_NODE_REPLICAS=2
+export AGENT_DOTNET_REPLICAS=2
+
+# Start with scaling configuration
+docker-compose -f docker-compose.yml -f docker-compose.scale.yml up -d
+
+# Check scaled agents
+docker-compose -f docker-compose.yml -f docker-compose.scale.yml ps
+```
+
+### Basic Mode (Testing Only)
+
+**Not recommended for regular use.** The base configuration alone provides:
+- All services with default settings
+- Standard resource limits
+- Basic networking
+
+```bash
+# Start with base configuration only
+docker-compose up -d
+```
+
+> **⚠️ Warning:** This mode is only suitable for quick testing. Always use dev or prod overlays for actual work.
 
 ## Kubernetes Deployment
 

@@ -29,18 +29,18 @@ ENV QB_VERSION=14.0.11
 ENV QB_AGENT_DOWNLOAD_URL=https://www.pmease.com/quickbuild/downloads/quickbuild-${QB_VERSION}.zip
 
 # Create directories
-RUN mkdir -p /opt/qb-agent /opt/qb-agent/conf /tmp/qb-install
+RUN mkdir -p /opt/qb-agent /opt/qb-agent/conf /opt/qb-agent/bin /tmp/qb-install
 
-# Copy real QuickBuild 14.0.32 agent installation
-COPY quickbuild-agent/ /opt/qb-agent/
+# Copy QuickBuild 14 agent installation (place extracted agent files in qb-agent/base/quickbuild-agent/)
+COPY qb-agent/base/quickbuild-agent/ /opt/qb-agent/
 
-# Copy agent entrypoint script
-COPY agent-entrypoint.sh /opt/qb-agent/
+# Copy agent entrypoint script (using repository root build context)
+COPY qb-agent/base/agent-entrypoint.sh /opt/qb-agent/
 
 # Set proper permissions
 RUN chown -R qbagent:qbagent /opt/qb-agent && \
     chmod +x /opt/qb-agent/agent-entrypoint.sh && \
-    chmod +x /opt/qb-agent/agent.sh 2>/dev/null || true
+    chmod +x /opt/qb-agent/bin/agent.sh 2>/dev/null || true
 
 # Set environment variables
 ENV QB_AGENT_HOME=/opt/qb-agent

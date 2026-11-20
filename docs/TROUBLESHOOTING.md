@@ -510,13 +510,16 @@ Comprehensive troubleshooting guide for common issues, solutions, and diagnostic
    docker system df
    ```
 
-2. **Clean Up Docker Resources**
-   ```bash
-   # Remove unused containers, networks, images
-   docker system prune -a
+2. **Clean Up Project Docker Resources**
 
-   # Remove unused volumes (CAUTION: This removes data)
-   docker volume prune
+   > **⚠️ Safety Note:** Avoid system-wide destructive commands like `docker system prune -a` or `docker volume prune` that affect unrelated projects. Always target only QuickBuild project resources.
+
+   ```bash
+   # Stop and remove QuickBuild containers and networks
+   docker compose down
+
+   # Remove specific project volumes only if you intentionally want a fresh database/server state
+   docker compose down -v
    ```
 
 3. **Configure Log Rotation**

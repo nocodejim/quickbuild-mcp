@@ -48,7 +48,7 @@ Complete reference for all configuration options, environment variables, and cus
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MAVEN_OPTS` | `-Xmx1024m -XX:MaxPermSize=256m` | Maven JVM options |
+| `MAVEN_OPTS` | `-Xmx1024m` | Maven JVM options |
 
 #### .NET Agent Specific
 
@@ -219,7 +219,7 @@ data:
 data:
   QB_SERVER_URL: "http://qb-server-service:8810"
   AGENT_PORT: "8811"
-  MAVEN_OPTS: "-Xmx1024m -XX:MaxPermSize=256m"
+  MAVEN_OPTS: "-Xmx1024m"
 ```
 
 ### Secrets

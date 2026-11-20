@@ -2,8 +2,6 @@
 # Extends docker-compose.yml with development-specific configurations
 # Includes debugging, volume mounts, and development conveniences
 
-version: '3.8'
-
 services:
   # Database with development settings
   qb-database:
@@ -46,7 +44,7 @@ services:
   # Maven agent with development settings
   qb-agent-maven:
     environment:
-      - MAVEN_OPTS=-Xmx512m -XX:MaxPermSize=128m
+      - MAVEN_OPTS=-Xmx512m
       - QB_LOG_LEVEL=DEBUG
     volumes:
       # Mount local Maven repository for faster builds
@@ -85,6 +83,13 @@ services:
         limits:
           cpus: '2'
           memory: 2G
+
+  # MCP server with development settings
+  mcp-quickbuild-server:
+    environment:
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./src:/usr/src/app/src:ro
 
 # Development-specific volumes
 volumes:

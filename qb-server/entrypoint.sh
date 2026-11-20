@@ -19,6 +19,10 @@ echo "Data Directory: $QB_DATA"
 # Function to validate environment variables
 validate_environment() {
     echo "Validating environment variables..."
+
+    if [ -z "${QB_DB_PASSWORD:-}" ] && [ -n "${QB_DB_PASSWORD_FILE:-}" ] && [ -f "${QB_DB_PASSWORD_FILE}" ]; then
+        export QB_DB_PASSWORD="$(tr -d '\r\n' < "${QB_DB_PASSWORD_FILE}")"
+    fi
     
     local required_vars=(
         "QB_DB_HOST"

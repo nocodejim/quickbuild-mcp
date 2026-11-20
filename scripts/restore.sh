@@ -34,6 +34,18 @@ warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+# Compose command helper (supports Docker Compose v2+ plugin and legacy v1)
+run_compose() {
+    if docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    else
+        error "Neither 'docker compose' nor 'docker-compose' is available"
+        exit 1
+    fi
+}
+
 # Usage function
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -210,12 +222,12 @@ restore_docker_compose() {
     
     # Stop containers before restore
     log "Stopping containers..."
-    docker-compose -p "$COMPOSE_PROJECT" down || true
+    run_compose -p "$COMPOSE_PROJECT" down || true
     
     # Restore database data
-    if [[ -f "$BACKUP_PATH/database/db_data_"*.tar.gz ]]; then
+    local db_backup=$(find "$BACKUP_PATH/database" -name "db_data_*.tar.gz" 2>/dev/null | head -1)
+    if [[ -n "$db_backup" && -f "$db_backup" ]]; then
         log "Restoring database data..."
-        local db_backup=$(find "$BACKUP_PATH/database" -name "db_data_*.tar.gz" | head -1)
         
         # Remove existing volume
         docker volume rm "${COMPOSE_PROJECT}_db_data" 2>/dev/null || true
@@ -226,15 +238,15 @@ restore_docker_compose() {
             -v "${COMPOSE_PROJECT}_db_data:/target" \
             -v "$BACKUP_PATH:/backup:ro" \
             ubuntu:20.04 \
-            tar -xzf "/backup/$(basename "$db_backup")" -C /target
+            tar -xzf "/backup/database/$(basename "$db_backup")" -C /target
         
         success "Database data restored"
     fi
     
     # Restore database logs
-    if [[ -f "$BACKUP_PATH/database/db_logs_"*.tar.gz ]]; then
+    local logs_backup=$(find "$BACKUP_PATH/database" -name "db_logs_*.tar.gz" 2>/dev/null | head -1)
+    if [[ -n "$logs_backup" && -f "$logs_backup" ]]; then
         log "Restoring database logs..."
-        local logs_backup=$(find "$BACKUP_PATH/database" -name "db_logs_*.tar.gz" | head -1)
         
         # Remove existing volume
         docker volume rm "${COMPOSE_PROJECT}_db_logs" 2>/dev/null || true
@@ -245,15 +257,15 @@ restore_docker_compose() {
             -v "${COMPOSE_PROJECT}_db_logs:/target" \
             -v "$BACKUP_PATH:/backup:ro" \
             ubuntu:20.04 \
-            tar -xzf "/backup/$(basename "$logs_backup")" -C /target
+            tar -xzf "/backup/database/$(basename "$logs_backup")" -C /target
         
         success "Database logs restored"
     fi
     
     # Restore server data
-    if [[ -f "$BACKUP_PATH/server/server_data_"*.tar.gz ]]; then
+    local server_backup=$(find "$BACKUP_PATH/server" -name "server_data_*.tar.gz" 2>/dev/null | head -1)
+    if [[ -n "$server_backup" && -f "$server_backup" ]]; then
         log "Restoring server data..."
-        local server_backup=$(find "$BACKUP_PATH/server" -name "server_data_*.tar.gz" | head -1)
         
         # Remove existing volume
         docker volume rm "${COMPOSE_PROJECT}_server_data" 2>/dev/null || true
@@ -264,7 +276,7 @@ restore_docker_compose() {
             -v "${COMPOSE_PROJECT}_server_data:/target" \
             -v "$BACKUP_PATH:/backup:ro" \
             ubuntu:20.04 \
-            tar -xzf "/backup/$(basename "$server_backup")" -C /target
+            tar -xzf "/backup/server/$(basename "$server_backup")" -C /target
         
         success "Server data restored"
     fi
@@ -283,14 +295,14 @@ restore_docker_compose() {
                 -v "$volume_name:/target" \
                 -v "$BACKUP_PATH:/backup:ro" \
                 ubuntu:20.04 \
-                tar -xzf "/backup/$(basename "$cache_backup")" -C /target
+                tar -xzf "/backup/server/$(basename "$cache_backup")" -C /target
             
             success "$cache cache restored"
         fi
     done
     
     log "Starting containers..."
-    docker-compose -p "$COMPOSE_PROJECT" up -d
+    run_compose -p "$COMPOSE_PROJECT" up -d
     
     success "Docker Compose restore completed"
 }
@@ -312,9 +324,9 @@ restore_kubernetes() {
     fi
     
     # Restore from manifests if available
-    if [[ -f "$BACKUP_PATH/manifests/all_resources_"*.yaml ]]; then
+    local manifest_file=$(find "$BACKUP_PATH/manifests" -name "all_resources_*.yaml" 2>/dev/null | head -1)
+    if [[ -n "$manifest_file" && -f "$manifest_file" ]]; then
         log "Restoring Kubernetes resources..."
-        local manifest_file=$(find "$BACKUP_PATH/manifests" -name "all_resources_*.yaml" | head -1)
         
         # Apply the manifests (this will restore ConfigMaps, Secrets, etc.)
         kubectl apply -f "$manifest_file" -n "$NAMESPACE" || warning "Some resources may already exist"
@@ -332,7 +344,7 @@ validate_restore() {
     case "$ENVIRONMENT" in
         "docker-compose")
             # Check if containers are running
-            if docker-compose -p "$COMPOSE_PROJECT" ps | grep -q "Up"; then
+            if run_compose -p "$COMPOSE_PROJECT" ps | grep -q "Up"; then
                 success "Containers are running"
             else
                 warning "Some containers may not be running"

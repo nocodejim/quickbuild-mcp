@@ -1,4 +1,4 @@
-# QuickBuild 14 Agent Scaling Script (PowerShell)
+﻿# QuickBuild 14 Agent Scaling Script (PowerShell)
 # Provides easy scaling of build agents up or down
 # Supports different agent types and scaling strategies
 
@@ -129,6 +129,7 @@ function Scale-AllAgents {
                 $NewCount = $CurrentCount - $Count
                 if ($NewCount -lt 0) { $NewCount = 0 }
             }
+            "set" { $NewCount = $Count }
             default {
                 Write-Host "Error: Invalid operation $Operation" -ForegroundColor Red
                 return $false

@@ -51,6 +51,3 @@ hibernate.jdbc.batch_versioned_data=true
 # Transaction settings
 hibernate.transaction.factory_class=org.hibernate.transaction.JDBCTransactionFactory
 hibernate.current_session_context_class=thread
-
-# Schema validation (set to validate in production)
-hibernate.hbm2ddl.auto=update

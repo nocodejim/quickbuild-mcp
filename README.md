@@ -1,184 +1,133 @@
-# QuickBuild 14 Containerization with Microsoft SQL Server
+# QuickBuild MCP Server & Containerized Infrastructure
 
-> **Status:** ✅ Production Ready - Complete Implementation
+A unified repository combining:
+1. **QuickBuild MCP Server** (`src/`): A Python **Model Context Protocol (MCP v2)** server enabling AI agents and LLMs to inspect and automate QuickBuild CI/CD workflows.
+2. **QuickBuild 14 + Microsoft SQL Server 2022 Stack** (`qb-database/`, `qb-server/`, `qb-agent/`, `kubernetes/`, `scripts/`): Multi-tier containerized QuickBuild infrastructure with Docker Compose and Kubernetes support.
 
-A production-ready, multi-tiered containerized deployment of QuickBuild 14 with Microsoft SQL Server as the database backend.
-
-## 🏗️ Project Overview
-
-This project provides complete Docker infrastructure for QuickBuild 14 with:
-- **Database Tier:** Microsoft SQL Server 2022 (Linux container)
-- **Application Tier:** QuickBuild 14 Server with dynamic configuration
-- **Agent Tier:** Scalable build agents (Base, Maven, Node.js, .NET variants)
-- **Orchestration:** Docker Compose and Kubernetes support
-- **Operations:** Backup, restore, monitoring, and validation tools
-
-## 📋 Implementation Status
-
-- ✅ Project structure and configuration templates
-- ✅ Database container (Microsoft SQL Server 2022)
-- ✅ QuickBuild server container (QB 14.0.11)
-- ✅ Build agent containers (Base, Maven, Node.js, .NET)
-- ✅ Docker Compose orchestration (dev, prod, scaling)
-- ✅ Kubernetes manifests (production deployment)
-- ✅ Backup and restore functionality
-- ✅ Validation and monitoring scripts
-- ✅ Comprehensive documentation
-
-## 🚀 Quick Start (< 5 Minutes)
-
-### Prerequisites
-
-- Docker Engine 20.10+
-- Docker Compose 2.0+
-- 4GB+ available RAM
-- 20GB+ available disk space
-
-### 1. Clone and Configure
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd quickbuild14-containerization
-
-# Copy and configure environment
-cp .env.example .env
-# Edit .env with your passwords (see Configuration section)
-```
-
-### 2. Deploy with Docker Compose
-
-```bash
-# Start the complete stack
-docker-compose up -d
-
-# Verify deployment
-./scripts/validate-deployment.sh -e docker-compose
-
-# Monitor status
-./scripts/monitor.sh -e docker-compose --once
-```
-
-### 3. Access QuickBuild
-
-- **Web Interface:** http://localhost:8810
-- **Default Login:** admin/admin (change immediately)
-- **Agent Status:** Check connected agents in the web interface
-
-### 4. Scale Build Agents (Optional)
-
-```bash
-# Scale Maven agents to 3 replicas
-./scripts/scale-agents.sh scale maven 3
-
-# Scale all agents up by 1
-./scripts/scale-agents.sh up 1
-
-# Check scaling status
-./scripts/scale-agents.sh status
-```
-
-That's it! Your QuickBuild 14 environment is ready for use.
-
-### Prerequisites
-
-- Docker Engine 20.10+
-- Docker Compose 2.0+
-- 4GB+ available RAM
-- 20GB+ available disk space
-
-### Basic Setup
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd quickbuild14-containerization
-
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your configuration
-# (Update passwords and settings)
-
-# Start the stack (when implementation complete)
-docker-compose up -d
-```
-
-## 📁 Project Structure
-
-```
-quickbuild14-mssql/
-├── qb-server/              # QuickBuild server container
-├── qb-database/            # Microsoft SQL Server container  
-├── qb-agent/               # Build agent containers
-│   ├── base/               # Base agent image
-│   ├── maven/              # Maven-enabled agent
-│   ├── node/               # Node.js-enabled agent
-│   └── dotnet/             # .NET-enabled agent
-├── kubernetes/             # Kubernetes deployment manifests
-├── docs/                   # Comprehensive documentation
-├── scripts/                # Operational scripts
-├── docker-compose.yml      # Docker Compose orchestration
-├── .env.example           # Environment configuration template
-└── README.md              # This file
-```
-
-## 🔧 Configuration
-
-All configuration is managed through environment variables. See `.env.example` for complete reference.
-
-### Key Configuration Areas
-
-- **Database:** SQL Server connection, authentication, storage
-- **Server:** QuickBuild server settings, networking, persistence  
-- **Agents:** Agent scaling, toolchain selection, registration
-- **Security:** TLS/SSL, secrets management, access controls
-- **Operations:** Monitoring, logging, backup configuration
-
-## 📚 Documentation
-
-Comprehensive documentation will be available in the `docs/` directory:
-
-- **DEPLOYMENT.md** - Detailed deployment procedures
-- **CONFIGURATION.md** - Complete configuration reference
-- **BACKUP-RESTORE.md** - Backup and restore procedures
-- **TROUBLESHOOTING.md** - Common issues and solutions
-- **SECURITY.md** - Security best practices
-
-## 🔒 Security Features
-
-- Non-root container execution
-- Secrets management via Docker/Kubernetes secrets
-- Network isolation and port restrictions
-- Vulnerability scanning integration
-- TLS/SSL support for production deployments
-
-## 📊 Monitoring & Operations
-
-- Health checks for all services
-- Centralized logging configuration
-- Backup and restore automation
-- Performance monitoring guidelines
-- Scaling procedures for build agents
-
-## 🤝 Contributing
-
-This project follows a specification-driven development approach. See:
-- Requirements: `.kiro/specs/quickbuild14-containerization/requirements.md`
-- Design: `.kiro/specs/quickbuild14-containerization/design.md`  
-- Tasks: `.kiro/specs/quickbuild14-containerization/tasks.md`
-
-## 📄 License
-
-[License information to be added]
-
-## 🆘 Support
-
-For issues and questions:
-- Check the troubleshooting documentation (when available)
-- Review the implementation logs in `environment/docs/`
-- Open an issue in the project repository
+> See [TODO.md](TODO.md) for the full cleanup status and the roadmap for upgrading QuickBuild and MSSQL versions.
 
 ---
 
-**Implementation Progress:** This project is actively being developed following a comprehensive specification. Check `environment/docs/project-overview.md` for current status and progress updates.
+## 1. QuickBuild MCP Server
+
+### Features
+
+#### MCP Tools
+- `builds.trigger` — Trigger a new build for a configuration ID with optional build variables.
+- `builds.get_latest_status` — Retrieve the status, version, timestamps, and success flag of the latest build for a configuration.
+- `grid.list_agents` — List all build agents and their online/offline status.
+- `system.backup_database` — Initiate a server-side QuickBuild database backup (with optional `backup_path`).
+- `system.get_version` — Retrieve QuickBuild server version metadata.
+
+#### MCP Resources & Resource Templates
+- `configurations://list` — List all build configurations and parent hierarchy.
+- `changes://build/{build_id}` — Retrieve SCM changes for a specific build ID (registered as both a resource and a parameterized resource template).
+
+### Running the MCP Server Locally
+
+```bash
+# Install dependencies (Python 3.11+ / 3.12 recommended)
+pip install -r requirements.txt
+# Or with uv:
+uv run --no-project --with-requirements requirements.txt python -m src.server
+```
+
+Configure `.env` (copied from `.env.example`):
+
+```env
+QB_URL=http://localhost:8810
+QB_USER=admin
+QB_PASSWORD=your_qb_password
+LOG_LEVEL=INFO
+QB_CACHE_TTL_CONFIGS=300
+QB_CACHE_TTL_AGENTS=30
+```
+
+### Running Unit Tests
+
+```bash
+# Local test run with coverage
+uv run --no-project --with-requirements requirements.txt pytest
+
+# Or via Docker test container
+python run_tests.py
+```
+
+---
+
+## 2. QuickBuild 14 + Microsoft SQL Server 2022 Stack
+
+### Architecture Overview
+
+- **Database Tier (`qb-database/`):** Microsoft SQL Server 2022 (Linux container) with automated `quickbuild` database and `qb_user` initialization (`sqlcmd` supporting both `mssql-tools18` and `mssql-tools`).
+- **Application Tier (`qb-server/`):** QuickBuild 14 Server (Eclipse Temurin JDK 8) with dynamic `hibernate.properties` and `wrapper.conf` generation.
+- **Agent Tier (`qb-agent/`):** Scalable build agents (`base`, `maven`, `node`, `dotnet`).
+- **MCP Integration (`Dockerfile`):** Non-root Python 3.12 container running `mcp-quickbuild-server` on `qb-net`.
+- **Orchestration:** `docker-compose.yml` (+ `.dev.yml`, `.prod.yml`, `.scale.yml`) and `kubernetes/` manifests.
+
+### Prerequisites
+
+- Docker Engine 20.10+ and Docker Compose v2+ (`docker compose`)
+- 4GB+ available RAM (8GB+ recommended for full stack)
+- 20GB+ available disk space
+- QuickBuild 14 server distribution placed in `environment/quickbuild-14.0.32/quickbuild-14.0.32/` and QuickBuild agent files in `qb-agent/base/quickbuild-agent/` (gitignored)
+
+### Quick Start
+
+1. Copy and configure environment variables:
+
+```bash
+cp .env.example .env
+# Update MSSQL_SA_PASSWORD, QB_DB_PASSWORD, and QB_PASSWORD in .env
+```
+
+2. Choose your Docker Compose deployment mode:
+
+| Mode | Command | Purpose |
+|------|---------|---------|
+| **Development** | `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d` | Exposed DB/JVM debug ports, `DEBUG` logging, local bind mounts |
+| **Production** | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` | Docker secrets (`./secrets/`), TLS, higher resource limits |
+| **Scaling** | `docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d` | Replicated build agents with rolling update policies |
+| **Base** | `docker compose up -d` | Standard single-file compose stack |
+
+3. Access QuickBuild and validate:
+
+- **Web Interface:** `http://localhost:8810`
+- **Validate deployment:** `./scripts/validate-deployment.sh -e docker-compose`
+- **Monitor status:** `./scripts/monitor.sh -e docker-compose --once`
+- **Scale agents:** `./scripts/scale-agents.sh scale maven 3`
+
+---
+
+## Project Structure
+
+```text
+quickbuild-mcp/
+├── src/                        # QuickBuild MCP Server (Python + MCP SDK v2)
+│   ├── features/               # builds, changes, configurations, grid, system
+│   ├── models/                 # Agent, Build, Change, Configuration dataclasses
+│   ├── quickbuild_client.py    # Async httpx client with retry & TTL cache
+│   └── server.py               # MCP Server core & request dispatch
+├── tests/                      # Pytest unit test suite
+├── qb-database/                # MSSQL 2022 Dockerfile, entrypoint, healthcheck, SQL init
+├── qb-server/                  # QuickBuild 14 Dockerfile, entrypoint, config templates
+├── qb-agent/                   # Base, Maven, Node.js, and .NET agent images
+├── kubernetes/                 # K8s manifests (Namespace, RBAC, StatefulSets, PVCs, Ingress)
+├── scripts/                    # Operational scripts (backup, restore, scale, monitor, validate)
+├── docs/                       # Deployment, configuration, and troubleshooting guides
+├── docker-compose*.yml         # Compose base and environment overrides
+├── Dockerfile                  # MCP server production image (Python 3.12, non-root)
+├── Dockerfile.test             # MCP server test runner image
+├── pyproject.toml              # Python project & coverage configuration
+├── pytest.ini                  # Pytest configuration
+└── TODO.md                     # Cleanup summary and upgrade roadmap
+```
+
+## Documentation
+
+- [DEPLOYMENT.md](docs/DEPLOYMENT.md) — Docker Compose & Kubernetes deployment procedures
+- [CONFIGURATION.md](docs/CONFIGURATION.md) — Environment variables and tuning reference
+- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — Common issues and diagnostics
+- [CLOUD-DEPLOYMENT-SPECS.md](docs/CLOUD-DEPLOYMENT-SPECS.md) — AWS, Azure, and GCP guidance
+- [STEP-BY-STEP-MANUAL-INSTRUCTIONS.md](docs/STEP-BY-STEP-MANUAL-INSTRUCTIONS.md) — Manual container setup walkthrough
+- [QUICK-START-SIMPLIFIED.md](docs/QUICK-START-SIMPLIFIED.md) — Simplified external-DB startup guide

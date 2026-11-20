@@ -33,7 +33,7 @@ class TestConfigurationsFeature:
         assert isinstance(resources[0], Resource)
         assert str(resources[0].uri) == "configurations://list"
         assert resources[0].name == "Build Configurations"
-        assert resources[0].mimeType == "application/json"
+        assert resources[0].mime_type == "application/json"
     
     @pytest.mark.asyncio
     async def test_handle_tool_call_not_implemented(self, feature):

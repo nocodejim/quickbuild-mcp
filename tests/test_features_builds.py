@@ -29,15 +29,15 @@ class TestBuildsFeature:
         # Check builds.get_latest_status tool
         status_tool = next(t for t in tools if t.name == "builds.get_latest_status")
         assert isinstance(status_tool, Tool)
-        assert "configuration_id" in status_tool.inputSchema["properties"]
-        assert status_tool.inputSchema["required"] == ["configuration_id"]
+        assert "configuration_id" in status_tool.input_schema["properties"]
+        assert status_tool.input_schema["required"] == ["configuration_id"]
         
         # Check builds.trigger tool
         trigger_tool = next(t for t in tools if t.name == "builds.trigger")
         assert isinstance(trigger_tool, Tool)
-        assert "configuration_id" in trigger_tool.inputSchema["properties"]
-        assert "variables" in trigger_tool.inputSchema["properties"]
-        assert trigger_tool.inputSchema["required"] == ["configuration_id"]
+        assert "configuration_id" in trigger_tool.input_schema["properties"]
+        assert "variables" in trigger_tool.input_schema["properties"]
+        assert trigger_tool.input_schema["required"] == ["configuration_id"]
     
     def test_get_resources(self, feature):
         """Test getting resources from builds feature"""

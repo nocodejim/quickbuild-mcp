@@ -29,8 +29,8 @@ class TestGridFeature:
         list_tool = tools[0]
         assert isinstance(list_tool, Tool)
         assert list_tool.name == "grid.list_agents"
-        assert list_tool.inputSchema["properties"] == {}
-        assert list_tool.inputSchema["additionalProperties"] is False
+        assert list_tool.input_schema["properties"] == {}
+        assert list_tool.input_schema["additionalProperties"] is False
     
     def test_get_resources(self, feature):
         """Test getting resources from grid feature"""

@@ -2,8 +2,6 @@
 # Extends docker-compose.yml with production-specific configurations
 # Includes secrets management, resource limits, and security enhancements
 
-version: '3.8'
-
 services:
   # Database with secrets and production settings
   qb-database:
@@ -72,7 +70,7 @@ services:
   # Maven agent with production settings
   qb-agent-maven:
     environment:
-      - MAVEN_OPTS=-Xmx2048m -XX:MaxPermSize=512m
+      - MAVEN_OPTS=-Xmx2048m
     deploy:
       replicas: ${AGENT_MAVEN_REPLICAS:-2}
       resources:

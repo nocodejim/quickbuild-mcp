@@ -57,6 +57,17 @@ test_fail() {
     error "✗ $1"
 }
 
+run_compose() {
+    if docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    else
+        error "Neither 'docker compose' nor 'docker-compose' is available"
+        return 1
+    fi
+}
+
 # Usage function
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -122,7 +133,7 @@ done
 
 # Auto-detect environment if not specified
 if [[ -z "$ENVIRONMENT" ]]; then
-    if command -v docker-compose >/dev/null 2>&1 && [[ -f "$PROJECT_ROOT/docker-compose.yml" ]]; then
+    if (docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1) && [[ -f "$PROJECT_ROOT/docker-compose.yml" ]]; then
         ENVIRONMENT="docker-compose"
         log "Auto-detected environment: docker-compose"
     elif command -v kubectl >/dev/null 2>&1; then
@@ -174,7 +185,7 @@ validate_docker_compose() {
     
     # Test 1: Check if Docker Compose is available
     test_start "Docker Compose availability"
-    if command -v docker-compose >/dev/null 2>&1; then
+    if docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1; then
         test_pass "Docker Compose is available"
     else
         test_fail "Docker Compose not found"
@@ -192,9 +203,9 @@ validate_docker_compose() {
     
     # Test 3: Check container status
     test_start "Container status check"
-    local containers=$(docker-compose -p "$COMPOSE_PROJECT" ps -q 2>/dev/null || echo "")
+    local containers=$(run_compose -p "$COMPOSE_PROJECT" ps -q 2>/dev/null || echo "")
     if [[ -n "$containers" ]]; then
-        local running_containers=$(docker-compose -p "$COMPOSE_PROJECT" ps | grep -c "Up" || echo "0")
+        local running_containers=$(run_compose -p "$COMPOSE_PROJECT" ps | grep -cE "Up|running" || echo "0")
         if [[ "$running_containers" -gt 0 ]]; then
             test_pass "$running_containers containers are running"
         else
@@ -374,7 +385,7 @@ validate_performance() {
         "docker-compose")
             # Check Docker resource usage
             test_start "Docker resource usage"
-            local containers=$(docker-compose -p "$COMPOSE_PROJECT" ps -q 2>/dev/null)
+            local containers=$(run_compose -p "$COMPOSE_PROJECT" ps -q 2>/dev/null)
             if [[ -n "$containers" ]]; then
                 local stats=$(docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" $containers 2>/dev/null || echo "")
                 if [[ -n "$stats" ]]; then
@@ -415,7 +426,10 @@ generate_report() {
     echo "Tests Passed: $TESTS_PASSED"
     echo "Tests Failed: $TESTS_FAILED"
     
-    local success_rate=$((TESTS_PASSED * 100 / TESTS_TOTAL))
+    local success_rate=0
+    if [[ $TESTS_TOTAL -gt 0 ]]; then
+        success_rate=$((TESTS_PASSED * 100 / TESTS_TOTAL))
+    fi
     echo "Success Rate: ${success_rate}%"
     
     if [[ $TESTS_FAILED -eq 0 ]]; then

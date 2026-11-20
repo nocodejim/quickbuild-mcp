@@ -5,7 +5,7 @@ import pytest
 import json
 from unittest.mock import AsyncMock
 
-from mcp.types import Resource
+from mcp.types import Resource, ResourceTemplate
 
 from src.features.changes.feature import ChangesFeature
 from src.models import Change
@@ -35,7 +35,16 @@ class TestChangesFeature:
         assert "changes://build/" in str(resources[0].uri)
         assert "build_id" in str(resources[0].uri)
         assert resources[0].name == "Build Changes"
-        assert resources[0].mimeType == "application/json"
+        assert resources[0].mime_type == "application/json"
+
+    def test_get_resource_templates(self, feature):
+        """Test getting resource templates from changes feature"""
+        templates = feature.get_resource_templates()
+
+        assert len(templates) == 1
+        assert isinstance(templates[0], ResourceTemplate)
+        assert templates[0].uri_template == "changes://build/{build_id}"
+        assert templates[0].mime_type == "application/json"
     
     @pytest.mark.asyncio
     async def test_handle_tool_call_not_implemented(self, feature):
@@ -134,3 +143,13 @@ class TestChangesFeature:
         
         await feature.handle_resource_request("changes://build/abc-def-456")
         feature.qb_client.get_build_changes.assert_called_with("abc-def-456")
+
+    @pytest.mark.asyncio
+    async def test_handle_resource_request_missing_build_id(self, feature):
+        """Test missing or placeholder build_id returns error JSON"""
+        result = await feature.handle_resource_request("changes://build/")
+        data = json.loads(result)
+        assert data["error"] == "build_id is required"
+
+        placeholder = await feature.handle_resource_request("changes://build/{build_id}")
+        assert json.loads(placeholder)["error"] == "build_id is required"

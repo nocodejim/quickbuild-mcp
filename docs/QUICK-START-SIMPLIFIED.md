@@ -47,8 +47,15 @@ sudo chmod +x /usr/local/bin/docker-compose
 git clone <your-repo>
 cd quickbuild-mcp
 
-# Quick test with simplified setup
-docker-compose -f docker-compose.simple.yml up -d
+# Configure environment
+cp .env.example .env
+# Edit .env with your passwords
+
+# Quick test with development setup
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# Check status
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml ps
 ```
 
 ### Option 3: Kubernetes Testing
@@ -200,10 +207,9 @@ docker exec qb-database /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "TestP
 # Test QuickBuild web interface
 curl -I http://localhost:8810
 
-# Clean restart
-docker-compose down -v
-docker system prune -f
-docker-compose up -d
+# Clean restart (targets only this project's containers and volumes)
+docker compose down -v
+docker compose up -d
 ```
 
 This simplified approach should get you running much faster by avoiding the complex database initialization issues.
