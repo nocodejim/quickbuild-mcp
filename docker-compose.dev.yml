@@ -1,4 +1,4 @@
-# QuickBuild 14 Development Docker Compose Override
+# QuickBuild 16 Development Docker Compose Override
 # Extends docker-compose.yml with development-specific configurations
 # Includes debugging, volume mounts, and development conveniences
 
@@ -26,8 +26,8 @@ services:
       - "8810:8810"
       - "5005:5005"  # JVM debug port
     volumes:
-      # Mount source for live development
-      - ./qb-server/conf:/opt/quickbuild/conf:ro
+      # conf/ lives on the qb-server-data volume (seeded and symlinked by the entrypoint);
+      # do not bind-mount over /opt/quickbuild/conf
       - ./logs:/opt/quickbuild/data/logs
 
   # Base agent with development settings
@@ -106,3 +106,9 @@ volumes:
       type: none
       o: bind
       device: ./dev-data/server-data
+  qb-server-storage:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./dev-data/server-storage

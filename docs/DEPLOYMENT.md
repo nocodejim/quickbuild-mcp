@@ -1,6 +1,6 @@
-# QuickBuild 14 Deployment Guide
+# QuickBuild 16 Deployment Guide
 
-This guide provides detailed deployment procedures for QuickBuild 14 containerization solution in both Docker Compose and Kubernetes environments.
+This guide provides detailed deployment procedures for the QuickBuild 16 (Java 21, SQL Server 2025) containerization solution in both Docker Compose and Kubernetes environments.
 
 ## Table of Contents
 
@@ -18,13 +18,13 @@ This guide provides detailed deployment procedures for QuickBuild 14 containeriz
 - **CPU:** 4+ cores recommended
 - **Memory:** 8GB+ RAM (16GB+ for production)
 - **Storage:** 50GB+ available disk space
-- **Network:** Internet access for image downloads
+- **Network:** Internet access for image downloads and the QuickBuild 16 distribution (downloaded and SHA-256 verified at build time; place `quickbuild-16.0.37.zip` in `environment/` for offline builds)
 
 ### Software Requirements
 
 #### For Docker Compose
 - Docker Engine 20.10+
-- Docker Compose 2.0+
+- Docker Compose 2.0+ (the images use classic-builder Dockerfile features only; BuildKit is not required)
 - Git
 - curl (for validation scripts)
 
@@ -60,7 +60,7 @@ Perfect for development, testing, and small teams.
 ```bash
 # Clone repository
 git clone <repository-url>
-cd quickbuild14-containerization
+cd quickbuild-mcp
 
 # Configure environment
 cp .env.example .env
@@ -76,8 +76,10 @@ MSSQL_SA_PASSWORD=YourStrongSAPassword123!
 QB_DB_PASSWORD=YourStrongQBPassword123!
 
 # Optional: Customize other settings
-COMPOSE_PROJECT_NAME=quickbuild14
+COMPOSE_PROJECT_NAME=quickbuild
 QB_SERVER_PORT=8810
+# If another Docker network already uses 172.20.0.0/16:
+# QB_NETWORK_SUBNET=10.220.0.0/16
 ```
 
 #### 3. Deploy Development Stack
@@ -90,6 +92,9 @@ QB_SERVER_PORT=8810
 - Local directory volume mounts
 
 ```bash
+# Build images (toolchain agents are built FROM qb-agent-base:latest, so build it first)
+docker compose build qb-agent-base && docker compose build
+
 # Start with development configuration
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
@@ -143,6 +148,9 @@ cp .env.example .env
 QB_ENABLE_TLS=true
 BACKUP_RETENTION_DAYS=30
 QB_LOG_LEVEL=WARN
+
+# The production override bind-mounts host directories under QB_DATA_PATH
+mkdir -p "${QB_DATA_PATH:-/opt/quickbuild/data}"/{db-data,db-logs,server-data,server-storage}
 ```
 
 #### 3. Deploy Production Stack
@@ -307,23 +315,41 @@ kubectl port-forward service/qb-server-service 8810:8810 -n quickbuild
 
 ### First-Time Configuration
 
-#### 1. Access QuickBuild
+#### 1. Complete the Setup Wizard
+
+QuickBuild 16 starts in setup mode on an empty database (the REST API answers 404 until setup is
+finished). Open the web interface and complete the three wizard steps:
 
 - **Docker Compose:** http://localhost:8810
 - **Kubernetes:** http://your-domain.com or via port-forward
 
-#### 2. Initial Login
+| Step | Field | Value |
+|------|-------|-------|
+| 1. Setup Administrator | Login name / password | Create the admin account (there is no default `admin/admin`); use it for the MCP server's `QB_USER` / `QB_PASSWORD` |
+| 2. System Setting | URL to Access QuickBuild | `http://qb-server:8810` (Compose) or `http://qb-server-service:8810` (Kubernetes) so agents can reach the server |
+| 2. System Setting | Global Storage Directory | `/var/lib/quickbuild/storage` (dedicated volume; QuickBuild rejects paths under its install dir `/opt/quickbuild`) |
+| 3. Email Setting | SMTP host / port | Your mail relay (required by the wizard) |
 
-- **Username:** admin
-- **Password:** admin
-- **⚠️ Change immediately after first login**
+#### 2. Authorize Build Agents
+
+QuickBuild 16 agents join the grid as **unauthorized** until an administrator approves them:
+
+```bash
+# List agents waiting for authorization
+curl -u admin:<password> -H 'Accept: application/json' http://localhost:8810/rest/buildagents/unauthorized
+
+# Authorize one agent (ip/port from the list above)
+curl -u admin:<password> "http://localhost:8810/rest/tokens/authorize?ip=<agent ip>&port=8811"
+```
+
+Or use **Grid → Unauthorized Nodes** in the web UI. Each agent container keeps its generated token
+across restarts; set `QB_AGENT_TOKEN` per agent to keep the same identity when containers are recreated.
 
 #### 3. Basic Configuration
 
-1. **Change Admin Password**
-2. **Configure System Settings**
-3. **Verify Agent Connectivity**
-4. **Create First Build Configuration**
+1. **Configure System Settings** (Administration → System Setting)
+2. **Verify Agent Connectivity** (Grid page)
+3. **Create First Build Configuration**
 
 ## Validation
 

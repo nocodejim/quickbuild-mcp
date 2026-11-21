@@ -1,39 +1,42 @@
-# QuickBuild 14 .NET Agent Container
-# Base: QB Base Agent + .NET SDK 6.0
-# Purpose: .NET Core/Framework build capabilities
+# QuickBuild 16 .NET Agent Container
+# Base: QB Base Agent (Ubuntu 24.04) + .NET SDK 10.0 LTS
+# Purpose: .NET build capabilities
+# Build qb-agent-base first: docker compose build qb-agent-base
 
-FROM qb-agent-base:latest
+ARG BASE_IMAGE=qb-agent-base:latest
+ARG DOTNET_SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0-noble
+
+# .NET SDK from Microsoft's official Ubuntu 24.04 image (no apt repository setup needed)
+FROM ${DOTNET_SDK_IMAGE} AS dotnet-sdk
+
+FROM ${BASE_IMAGE}
 
 # Metadata
 LABEL maintainer="QuickBuild Containerization Project"
-LABEL description="QuickBuild 14 .NET Build Agent"
-LABEL version="14.0"
+LABEL description="QuickBuild 16 .NET Build Agent"
+LABEL version="16.0"
 LABEL toolchain="dotnet"
 
 # Switch to root for installation
 USER root
 
-# Install .NET SDK dependencies
-RUN apt-get update && apt-get install -y \
+# Install .NET runtime dependencies (Ubuntu 24.04 package names)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
     libc6 \
-    libgcc1 \
+    libgcc-s1 \
     libgssapi-krb5-2 \
-    libicu66 \
-    libssl1.1 \
+    libicu74 \
+    libssl3t64 \
     libstdc++6 \
+    tzdata \
     zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Microsoft package repository
-RUN wget https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
-    dpkg -i packages-microsoft-prod.deb && \
-    rm packages-microsoft-prod.deb
-
-# Install .NET SDK 6.0
-ENV DOTNET_VERSION=6.0
-RUN apt-get update && \
-    apt-get install -y dotnet-sdk-6.0 && \
-    rm -rf /var/lib/apt/lists/*
+# Install .NET SDK 10.0
+ENV DOTNET_VERSION=10.0
+COPY --from=dotnet-sdk /usr/share/dotnet /usr/share/dotnet
+RUN ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 
 # Set .NET environment variables
 ENV DOTNET_ROOT=/usr/share/dotnet
@@ -78,7 +81,8 @@ RUN cd /tmp && \
 COPY --chown=qbagent:qbagent ./qb-agent/dotnet/config/global.json /opt/qb-agent/global.json
 
 # Create .NET-specific entrypoint script
-COPY --chown=qbagent:qbagent --chmod=755 ./qb-agent/dotnet/config/dotnet-entrypoint.sh /opt/qb-agent/dotnet-entrypoint.sh
+COPY --chown=qbagent:qbagent ./qb-agent/dotnet/config/dotnet-entrypoint.sh /opt/qb-agent/dotnet-entrypoint.sh
+RUN chmod 755 /opt/qb-agent/dotnet-entrypoint.sh
 
 # Verify .NET installation
 RUN dotnet --version && \

@@ -1,4 +1,4 @@
-# QuickBuild 14 Server StatefulSet
+# QuickBuild 16 Server StatefulSet
 # Provides persistent QuickBuild server service
 
 apiVersion: apps/v1
@@ -27,7 +27,7 @@ spec:
       serviceAccountName: quickbuild-server
       initContainers:
       - name: wait-for-database
-        image: busybox:1.35
+        image: busybox:1.37.0
         command: ['sh', '-c']
         args:
         - |
@@ -98,6 +98,11 @@ spec:
         volumeMounts:
         - name: qb-server-data
           mountPath: /opt/quickbuild/data
+        # QuickBuild global storage directory: must be outside the install dir
+        # (enter /var/lib/quickbuild/storage in the first-run setup wizard)
+        - name: qb-server-data
+          mountPath: /var/lib/quickbuild/storage
+          subPath: storage
         resources:
           requests:
             memory: "2Gi"

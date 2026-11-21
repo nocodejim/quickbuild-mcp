@@ -1,5 +1,5 @@
 #!/bin/bash
-# QuickBuild 14 Backup Script
+# QuickBuild Backup Script
 # Comprehensive backup solution for Docker Compose and Kubernetes deployments
 # Supports both QuickBuild data and SQL Server database backup
 
@@ -149,7 +149,7 @@ backup_docker_compose() {
         docker run --rm \
             -v "${COMPOSE_PROJECT}_db_data:/source:ro" \
             -v "$BACKUP_PATH:/backup" \
-            ubuntu:20.04 \
+            ubuntu:24.04 \
             tar czf "/backup/database/db_data_${TIMESTAMP}.tar.gz" -C /source .
         success "Database data backup completed"
     else
@@ -162,7 +162,7 @@ backup_docker_compose() {
         docker run --rm \
             -v "${COMPOSE_PROJECT}_db_logs:/source:ro" \
             -v "$BACKUP_PATH:/backup" \
-            ubuntu:20.04 \
+            ubuntu:24.04 \
             tar czf "/backup/database/db_logs_${TIMESTAMP}.tar.gz" -C /source .
         success "Database logs backup completed"
     fi
@@ -173,11 +173,24 @@ backup_docker_compose() {
         docker run --rm \
             -v "${COMPOSE_PROJECT}_server_data:/source:ro" \
             -v "$BACKUP_PATH:/backup" \
-            ubuntu:20.04 \
+            ubuntu:24.04 \
             tar czf "/backup/server/server_data_${TIMESTAMP}.tar.gz" -C /source .
         success "Server data backup completed"
     else
         warning "Server data volume not found"
+    fi
+
+    # Backup server global storage (build artifacts/reports; QuickBuild 16 storage directory)
+    log "Backing up server storage..."
+    if docker volume ls | grep -q "${COMPOSE_PROJECT}_server_storage"; then
+        docker run --rm \
+            -v "${COMPOSE_PROJECT}_server_storage:/source:ro" \
+            -v "$BACKUP_PATH:/backup" \
+            ubuntu:24.04 \
+            tar czf "/backup/server/server_storage_${TIMESTAMP}.tar.gz" -C /source .
+        success "Server storage backup completed"
+    else
+        warning "Server storage volume not found"
     fi
     
     # Backup agent caches
@@ -188,7 +201,7 @@ backup_docker_compose() {
             docker run --rm \
                 -v "$volume_name:/source:ro" \
                 -v "$BACKUP_PATH:/backup" \
-                ubuntu:20.04 \
+                ubuntu:24.04 \
                 tar czf "/backup/server/${cache}_cache_${TIMESTAMP}.tar.gz" -C /source .
             success "$cache cache backup completed"
         fi
@@ -227,7 +240,7 @@ backup_metadata() {
     "namespace": "$NAMESPACE",
     "compose_project": "$COMPOSE_PROJECT",
     "backup_version": "1.0",
-    "quickbuild_version": "14.0",
+    "quickbuild_version": "16.0",
     "backup_type": "full",
     "compressed": $COMPRESS,
     "validated": $VALIDATE

@@ -1,5 +1,5 @@
 #!/bin/bash
-# QuickBuild 14 Agent Scaling Script
+# QuickBuild Agent Scaling Script
 # Provides easy scaling of build agents up or down
 # Supports different agent types and scaling strategies
 
@@ -136,7 +136,7 @@ scale_all_agents() {
 
 # Function to show scaling status
 show_status() {
-    echo -e "${BLUE}QuickBuild 14 Agent Scaling Status${NC}"
+    echo -e "${BLUE}QuickBuild Agent Scaling Status${NC}"
     echo "=================================="
     
     local agent_types=("base" "maven" "node" "dotnet")

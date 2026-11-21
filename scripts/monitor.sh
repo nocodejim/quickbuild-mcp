@@ -1,5 +1,5 @@
 #!/bin/bash
-# QuickBuild 14 Monitoring Script
+# QuickBuild Monitoring Script
 # Continuous monitoring and health checking for QuickBuild deployment
 # Provides real-time status, metrics, and alerting capabilities
 
@@ -197,7 +197,7 @@ get_percentage() {
 # Docker Compose monitoring functions
 monitor_docker_compose() {
     clear
-    echo -e "${CYAN}QuickBuild 14 Monitoring Dashboard - Docker Compose${NC}"
+    echo -e "${CYAN}QuickBuild Monitoring Dashboard - Docker Compose${NC}"
     echo -e "${CYAN}=================================================${NC}"
     echo "Project: $COMPOSE_PROJECT"
     echo "Refresh: ${REFRESH_INTERVAL}s | Time: $(date +'%H:%M:%S')"
@@ -260,7 +260,7 @@ monitor_docker_compose() {
 # Kubernetes monitoring functions
 monitor_kubernetes() {
     clear
-    echo -e "${CYAN}QuickBuild 14 Monitoring Dashboard - Kubernetes${NC}"
+    echo -e "${CYAN}QuickBuild Monitoring Dashboard - Kubernetes${NC}"
     echo -e "${CYAN}=============================================${NC}"
     echo "Namespace: $NAMESPACE"
     echo "Refresh: ${REFRESH_INTERVAL}s | Time: $(date +'%H:%M:%S')"
@@ -315,7 +315,14 @@ check_quickbuild_health() {
         echo -e "${GREEN}✓ Web interface accessible${NC}"
         
         # Version check
-        local version=$(curl -s --max-time 5 "$qb_url/rest/version" 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+        # QuickBuild 16 requires authentication for /rest/version and answers in plain text
+        local -a qb_auth=()
+        if [[ -n "${QB_PASSWORD:-}" ]]; then
+            qb_auth=(-u "${QB_USER:-admin}:${QB_PASSWORD}")
+        fi
+        local version
+        version=$(curl -s --max-time 5 "${qb_auth[@]}" "$qb_url/rest/version" 2>/dev/null | grep -oE '^[0-9]+(\.[0-9]+)+' || true)
+        version="${version:-unknown}"
         if [[ "$version" != "unknown" ]]; then
             echo "  Version: $version"
         fi

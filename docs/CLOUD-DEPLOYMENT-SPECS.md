@@ -1,7 +1,7 @@
-# QuickBuild 14 Cloud Deployment Specifications
+# QuickBuild 16 Cloud Deployment Specifications
 
 ## Overview
-Comprehensive specifications for deploying QuickBuild 14 containers in cloud environments (AWS, Azure, GCP).
+Comprehensive specifications for deploying QuickBuild 16 containers in cloud environments (AWS, Azure, GCP).
 
 ## Cloud VM Requirements
 
@@ -329,7 +329,7 @@ data:
 ### Database Backup
 ```bash
 # SQL Server backup
-docker exec qb-database /opt/mssql-tools/bin/sqlcmd \
+docker exec qb-database /opt/mssql-tools18/bin/sqlcmd -C \
   -S localhost -U sa -P "TestPassword123!" \
   -Q "BACKUP DATABASE quickbuild TO DISK = '/var/opt/mssql/backup/quickbuild.bak'"
 
@@ -389,4 +389,4 @@ aws s3 cp quickbuild-data-$(date +%Y%m%d).tar.gz s3://your-backup-bucket/
 - Use Google Cloud Cost Management
 - Regular resource cleanup
 
-This specification provides comprehensive guidance for deploying QuickBuild 14 in any major cloud environment.
+This specification provides comprehensive guidance for deploying QuickBuild 16 in any major cloud environment.

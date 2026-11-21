@@ -1,4 +1,4 @@
-# QuickBuild 14 Server Service
+# QuickBuild 16 Server Service
 # Service for QuickBuild server access (internal and external)
 
 apiVersion: v1

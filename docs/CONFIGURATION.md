@@ -1,10 +1,11 @@
-# QuickBuild 14 Configuration Reference
+# QuickBuild 16 Configuration Reference
 
-Complete reference for all configuration options, environment variables, and customization settings for the QuickBuild 14 containerization solution.
+Complete reference for all configuration options, environment variables, and customization settings for the QuickBuild 16 containerization solution.
 
 ## Table of Contents
 
 - [Environment Variables](#environment-variables)
+- [Image Build Arguments](#image-build-arguments)
 - [Configuration Files](#configuration-files)
 - [Docker Compose Configuration](#docker-compose-configuration)
 - [Kubernetes Configuration](#kubernetes-configuration)
@@ -13,6 +14,18 @@ Complete reference for all configuration options, environment variables, and cus
 - [Performance Tuning](#performance-tuning)
 
 ## Environment Variables
+
+### MCP Server Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `QB_URL` | `http://localhost:8810` | QuickBuild server URL (`http://qb-server:8810` inside the compose network) |
+| `QB_USER` | `admin` | QuickBuild account used by the MCP server |
+| `QB_PASSWORD` | *Required* | Password for `QB_USER` |
+| `QB_AUTH_MODE` | `basic` | `basic`: HTTP Basic credentials on every request (the QuickBuild REST API scheme). `session`: legacy login via `POST /rest/authentication` (only for proxies that provide it) |
+| `QB_BACKUP_DIR` | `/opt/quickbuild/data/backup` | Server-side directory for `system.backup_database` when no `backup_path` is given |
+| `QB_CACHE_TTL_CONFIGS` | `300` | Configuration list cache TTL in seconds (`0` disables) |
+| `QB_CACHE_TTL_AGENTS` | `30` | Agent list cache TTL in seconds (`0` disables) |
 
 ### Database Configuration
 
@@ -35,13 +48,16 @@ Complete reference for all configuration options, environment variables, and cus
 | `QB_SERVER_PORT` | `8810` | QuickBuild server HTTP port |
 | `QB_SERVER_URL` | `http://qb-server:8810` | Server URL for agent connections |
 | `QB_LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARN, ERROR) |
+| `QB_STORAGE_DIR` | `/var/lib/quickbuild/storage` | Global storage directory to enter in the setup wizard (must be outside `/opt/quickbuild`; mounted as its own volume) |
+| `QB_JAVA_MAX_MEMORY_MB` | *(wrapper.conf: 2048)* | Optional JVM max heap override passed to the Java Service Wrapper |
 
 ### Build Agent Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AGENT_PORT` | `8811` | Agent communication port |
-| `AGENT_NAME` | *Auto-generated* | Agent name (hostname-timestamp) |
+| `AGENT_NAME` | *Auto-generated* | Display name in container logs (QuickBuild identifies agents by host name and port) |
+| `QB_AGENT_TOKEN` | *Generated* | Agent token written to `node.properties`. QuickBuild 16 agents require one; set it per agent to keep an authorized identity across container recreation |
 | `AGENT_REPLICAS` | `2` | Number of agents to start |
 
 #### Maven Agent Specific
@@ -62,8 +78,8 @@ Complete reference for all configuration options, environment variables, and cus
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `COMPOSE_PROJECT_NAME` | `quickbuild14` | Docker Compose project name |
-| `QB_NETWORK_SUBNET` | `172.20.0.0/16` | Custom network subnet |
+| `COMPOSE_PROJECT_NAME` | `quickbuild` | Docker Compose project name (prefixes volume/network names; set `quickbuild14` to keep volumes from older deployments) |
+| `QB_NETWORK_SUBNET` | `172.20.0.0/16` | Custom network subnet (change it if `docker compose up` reports `Pool overlaps with other one on this address space`) |
 
 ### Kubernetes Configuration
 
@@ -104,52 +120,59 @@ Complete reference for all configuration options, environment variables, and cus
 | `SKIP_SECURITY_SCAN` | `false` | Skip vulnerability scanning |
 | `USE_LOCAL_IMAGES` | `false` | Use local images instead of pulling |
 
+## Image Build Arguments
+
+Versions are pinned in the Dockerfiles. Compose forwards these build args from your shell/`.env`
+when set; otherwise the Dockerfile defaults apply.
+
+| Build arg | Default | Used by |
+|-----------|---------|---------|
+| `JDK_IMAGE` | `eclipse-temurin:21-jdk-noble` | `qb-server`, `qb-agent-base` |
+| `QB_VERSION` | `16.0.37` | `qb-server`, `qb-agent-base` |
+| `QB_DOWNLOAD_URL` | `https://pmease.com/artifacts/6371/quickbuild-16.0.37.zip` | `qb-server`, `qb-agent-base` |
+| `QB_DOWNLOAD_SHA256` | SHA-256 of the 16.0.37 zip | `qb-server`, `qb-agent-base` (empty = skip check) |
+| `MSSQL_JDBC_VERSION` | `13.6.2.jre11` | `qb-server` (from Maven Central) |
+| `MSSQL_JDBC_SHA256` | SHA-256 of that jar | `qb-server` (empty = skip check) |
+| `MSSQL_IMAGE` | `mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04` | `qb-database` |
+| `BASE_IMAGE` | `qb-agent-base:latest` | `qb-agent-{maven,node,dotnet}` |
+| `MAVEN_VERSION` / `MAVEN_SHA512` | `3.9.16` / its SHA-512 | `qb-agent-maven` |
+| `NODE_VERSION` / `NVM_VERSION` | `24.22.3` / `v0.41.0` | `qb-agent-node` (exact Node version required) |
+| `DOTNET_SDK_IMAGE` | `mcr.microsoft.com/dotnet/sdk:10.0-noble` | `qb-agent-dotnet` |
+
+The QuickBuild distribution comes from `environment/quickbuild-${QB_VERSION}/` (unpacked) or
+`environment/quickbuild-${QB_VERSION}.zip` when present, otherwise from `QB_DOWNLOAD_URL`
+(see `qb-server/fetch-quickbuild-dist.sh`). When changing `QB_VERSION`, also set `QB_DOWNLOAD_URL`
+and `QB_DOWNLOAD_SHA256`. The images only use classic-builder Dockerfile features (no BuildKit needed).
+
 ## Configuration Files
 
 ### Hibernate Configuration Template
 
 Location: `qb-server/hibernate.properties.template`
 
-Key settings for Microsoft SQL Server:
+Rendered into `conf/hibernate.properties` on every container start. It mirrors the SQL Server
+section shipped with QuickBuild 16 (Hibernate 5.4, where `SQLServer2012Dialect` is the newest SQL
+Server dialect; it works with SQL Server 2016-2025):
 
 ```properties
-# Database connection
-hibernate.connection.driver_class=com.microsoft.sqlserver.jdbc.SQLServerDriver
 hibernate.dialect=org.hibernate.dialect.SQLServer2012Dialect
-hibernate.connection.url=jdbc:sqlserver://${QB_DB_HOST}:${QB_DB_PORT};databaseName=${QB_DB_NAME};encrypt=true;trustServerCertificate=true
+hibernate.connection.driver_class=com.microsoft.sqlserver.jdbc.SQLServerDriver
+hibernate.connection.url=jdbc:sqlserver://${QB_DB_HOST}:${QB_DB_PORT};databaseName=${QB_DB_NAME};encrypt=true;trustServerCertificate=true;loginTimeout=30
 
-# Connection pooling (C3P0)
-hibernate.c3p0.max_size=20
-hibernate.c3p0.min_size=5
-hibernate.c3p0.timeout=300
-hibernate.c3p0.max_statements=50
-
-# Performance settings
-hibernate.jdbc.batch_size=20
-hibernate.jdbc.fetch_size=100
-hibernate.cache.use_second_level_cache=true
+# Connection pool (HikariCP, as shipped with QuickBuild 16)
+hibernate.connection.provider_class=org.hibernate.hikaricp.internal.HikariCPConnectionProvider
+hibernate.hikari.maximumPoolSize=25
+hibernate.hbm2ddl.auto=update
 ```
 
-### Java Wrapper Configuration Template
+### Java Service Wrapper
 
-Location: `qb-server/wrapper.conf.template`
-
-Key settings for containerized deployment:
-
-```properties
-# Java settings
-wrapper.java.command=${JAVA_HOME}/bin/java
-wrapper.java.additional.1=-server
-wrapper.java.additional.2=-Dfile.encoding=UTF-8
-wrapper.java.additional.3=-Djava.awt.headless=true
-
-# Memory settings
-wrapper.java.initmemory=512
-wrapper.java.maxmemory=2048
-
-# Application settings
-wrapper.app.parameter.1=server
-```
+The server and agents run QuickBuild's bundled Java Service Wrapper with the `conf/wrapper.conf`
+shipped in the distribution (main class, classpath and the `--add-opens` flags required on
+Java 17+). The entrypoint starts the wrapper in the foreground as PID 1 (equivalent to
+`bin/server.sh console`), so `docker stop` shuts QuickBuild down gracefully. `wrapper.conf` and
+`wrapper-license.conf` are refreshed from the image on every start because they reference
+versioned jar names; set `QB_JAVA_MAX_MEMORY_MB` to change the heap size.
 
 ## Docker Compose Configuration
 
@@ -262,30 +285,26 @@ serverUrl=http://qb-server:8810
 port=8811
 
 # Agent identification
-name=<auto-generated>
-ip=<auto-detected>
-
-# Performance settings
-maxConcurrentBuilds=2
-buildTimeout=3600
+ip=<auto-detected container IP>
+token=<QB_AGENT_TOKEN, or kept from a previous start, or generated>
 ```
 
 ### Specialized Agent Configurations
 
 #### Maven Agent
-- Pre-installed Maven 3.8.8
+- Pre-installed Maven 3.9.16 (SHA-512 verified), compiling for Java 21 (`maven.compiler.release=21`)
 - Optimized `settings.xml` with local repository configuration
 - Build tools for native compilation
 - Pre-cached common plugins
 
 #### Node.js Agent
-- Node.js 16.20.2 via NVM
-- Global packages: TypeScript, Angular CLI, Vue CLI, React tools
+- Node.js 24.22.3 LTS via NVM v0.41.0
+- Global packages: TypeScript, Angular CLI, ESLint, Prettier, Jest, webpack (deprecated `create-react-app` and `@vue/cli` removed)
 - Yarn package manager
 - Optimized npm configuration
 
 #### .NET Agent
-- .NET SDK 6.0
+- .NET SDK 10.0 LTS (Ubuntu 24.04), `global.json` pinned to `10.0.100` with `rollForward: latestFeature`
 - Global tools: Entity Framework, Code Generator
 - NuGet configuration with package caching
 - Cross-platform compatibility
@@ -374,11 +393,9 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 
 #### Connection Pool Settings
 ```properties
-hibernate.c3p0.max_size=20          # Maximum connections
-hibernate.c3p0.min_size=5           # Minimum connections
-hibernate.c3p0.timeout=300          # Connection timeout (seconds)
-hibernate.c3p0.max_statements=50    # Prepared statement cache
-hibernate.c3p0.idle_test_period=3000 # Idle connection test interval
+# HikariCP (QuickBuild 16), set in qb-server/hibernate.properties.template
+hibernate.hikari.maximumPoolSize=25                       # Maximum connections
+hibernate.hikari.transactionIsolation=TRANSACTION_READ_COMMITTED
 ```
 
 #### SQL Server Configuration
@@ -524,4 +541,4 @@ cp .env.example .env.production
 docker-compose --env-file .env.production up -d
 ```
 
-This configuration reference provides comprehensive coverage of all customization options available in the QuickBuild 14 containerization solution.
+This configuration reference provides comprehensive coverage of all customization options available in the QuickBuild 16 containerization solution.

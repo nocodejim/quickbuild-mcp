@@ -1,20 +1,22 @@
-# QuickBuild 14 Node.js Agent Container
-# Base: QB Base Agent + Node.js 16.x via NVM
+# QuickBuild 16 Node.js Agent Container
+# Base: QB Base Agent + Node.js 24 LTS via NVM
 # Purpose: Node.js/npm/yarn build capabilities
+# Build qb-agent-base first: docker compose build qb-agent-base
 
-FROM qb-agent-base:latest
+ARG BASE_IMAGE=qb-agent-base:latest
+FROM ${BASE_IMAGE}
 
 # Metadata
 LABEL maintainer="QuickBuild Containerization Project"
-LABEL description="QuickBuild 14 Node.js Build Agent"
-LABEL version="14.0"
+LABEL description="QuickBuild 16 Node.js Build Agent"
+LABEL version="16.0"
 LABEL toolchain="nodejs"
 
 # Switch to root for installation
 USER root
 
 # Install Node.js dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     python3 \
     python3-pip \
@@ -23,13 +25,19 @@ RUN apt-get update && apt-get install -y \
 # Switch to qbagent user for NVM installation
 USER qbagent
 
-# Install NVM (Node Version Manager)
-ENV NVM_VERSION=v0.39.0
-ENV NODE_VERSION=16.20.2
+# Install NVM (Node Version Manager). NODE_VERSION must be an exact version (used in PATH).
+ARG NVM_VERSION=v0.41.0
+ARG NODE_VERSION=24.22.3
+ENV NVM_VERSION=${NVM_VERSION}
+ENV NODE_VERSION=${NODE_VERSION}
 ENV NVM_DIR=/opt/qb-agent/.nvm
 
-RUN echo "Installing NVM ${NVM_VERSION}..." && \
-    curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" | bash && \
+RUN set -eu; \
+    echo "Installing NVM ${NVM_VERSION}..."; \
+    mkdir -p "$NVM_DIR"; \
+    curl -fsSL -o /tmp/nvm-install.sh "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh"; \
+    bash /tmp/nvm-install.sh; \
+    rm -f /tmp/nvm-install.sh; \
     echo "✓ NVM installed successfully"
 
 # Install Node.js via NVM
@@ -54,15 +62,13 @@ RUN bash -c "source $NVM_DIR/nvm.sh && \
     npm install -g yarn && \
     echo '✓ Yarn installed successfully'"
 
-# Install common global packages
+# Install common global packages (deprecated create-react-app and @vue/cli removed)
 RUN bash -c "source $NVM_DIR/nvm.sh && \
     nvm use ${NODE_VERSION} && \
     echo 'Installing common global packages...' && \
     npm install -g \
         typescript \
         @angular/cli \
-        @vue/cli \
-        create-react-app \
         eslint \
         prettier \
         jest \
@@ -78,7 +84,8 @@ COPY --chown=qbagent:qbagent ./qb-agent/node/config/.npmrc /opt/qb-agent/.npmrc
 ENV PATH=/opt/qb-agent/.npm-global/bin:$PATH
 
 # Create entrypoint script that sources NVM
-COPY --chown=qbagent:qbagent --chmod=755 ./qb-agent/node/config/node-entrypoint.sh /opt/qb-agent/node-entrypoint.sh
+COPY --chown=qbagent:qbagent ./qb-agent/node/config/node-entrypoint.sh /opt/qb-agent/node-entrypoint.sh
+RUN chmod 755 /opt/qb-agent/node-entrypoint.sh
 
 # Verify installations
 RUN bash -c "source $NVM_DIR/nvm.sh && \

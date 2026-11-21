@@ -1,4 +1,4 @@
-# QuickBuild 14 Database Service
+# QuickBuild 16 Database Service
 # Internal service for SQL Server database access
 
 apiVersion: v1

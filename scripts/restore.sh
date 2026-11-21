@@ -1,5 +1,5 @@
 #!/bin/bash
-# QuickBuild 14 Restore Script
+# QuickBuild Restore Script
 # Comprehensive restore solution for Docker Compose and Kubernetes deployments
 # Supports restoration from backup files with validation and rollback
 
@@ -237,7 +237,7 @@ restore_docker_compose() {
         docker run --rm \
             -v "${COMPOSE_PROJECT}_db_data:/target" \
             -v "$BACKUP_PATH:/backup:ro" \
-            ubuntu:20.04 \
+            ubuntu:24.04 \
             tar -xzf "/backup/database/$(basename "$db_backup")" -C /target
         
         success "Database data restored"
@@ -256,7 +256,7 @@ restore_docker_compose() {
         docker run --rm \
             -v "${COMPOSE_PROJECT}_db_logs:/target" \
             -v "$BACKUP_PATH:/backup:ro" \
-            ubuntu:20.04 \
+            ubuntu:24.04 \
             tar -xzf "/backup/database/$(basename "$logs_backup")" -C /target
         
         success "Database logs restored"
@@ -275,10 +275,26 @@ restore_docker_compose() {
         docker run --rm \
             -v "${COMPOSE_PROJECT}_server_data:/target" \
             -v "$BACKUP_PATH:/backup:ro" \
-            ubuntu:20.04 \
+            ubuntu:24.04 \
             tar -xzf "/backup/server/$(basename "$server_backup")" -C /target
         
         success "Server data restored"
+    fi
+
+    # Restore server global storage
+    local storage_backup=$(find "$BACKUP_PATH/server" -name "server_storage_*.tar.gz" 2>/dev/null | head -1)
+    if [[ -n "$storage_backup" && -f "$storage_backup" ]]; then
+        log "Restoring server storage..."
+
+        docker volume rm "${COMPOSE_PROJECT}_server_storage" 2>/dev/null || true
+        docker volume create "${COMPOSE_PROJECT}_server_storage"
+        docker run --rm \
+            -v "${COMPOSE_PROJECT}_server_storage:/target" \
+            -v "$BACKUP_PATH:/backup:ro" \
+            ubuntu:24.04 \
+            tar -xzf "/backup/server/$(basename "$storage_backup")" -C /target
+
+        success "Server storage restored"
     fi
     
     # Restore agent caches
@@ -294,7 +310,7 @@ restore_docker_compose() {
             docker run --rm \
                 -v "$volume_name:/target" \
                 -v "$BACKUP_PATH:/backup:ro" \
-                ubuntu:20.04 \
+                ubuntu:24.04 \
                 tar -xzf "/backup/server/$(basename "$cache_backup")" -C /target
             
             success "$cache cache restored"

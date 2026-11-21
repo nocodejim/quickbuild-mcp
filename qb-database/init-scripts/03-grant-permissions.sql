@@ -1,4 +1,4 @@
--- QuickBuild 14 User Permissions Script
+-- QuickBuild User Permissions Script
 -- Grants necessary permissions to qb_user for QuickBuild operations
 -- Uses db_owner role for full database access as required by QuickBuild
 

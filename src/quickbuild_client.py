@@ -1,9 +1,10 @@
 import asyncio
 import logging
 import os
+import re
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Union
 
 import httpx
 from dotenv import load_dotenv
@@ -22,16 +23,54 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+# Supported authentication modes (QB_AUTH_MODE):
+#   basic   - HTTP Basic credentials on every request. This is how the QuickBuild REST API
+#             authenticates (QuickBuild 10-16), and the default.
+#   session - legacy login via POST /rest/authentication, then rely on the session cookie
+#             (only for deployments/proxies that expose such an endpoint).
+AUTH_MODES = ("basic", "session")
 
-def _parse_datetime(value: Optional[str]) -> datetime:
-    """Parse an ISO-8601 datetime string, falling back to current UTC time."""
-    if not value:
+# Build statuses that indicate a successful build
+SUCCESS_STATUSES = {"SUCCESSFUL", "RECOMMENDED"}
+
+# QuickBuild 16 reports some missing resources as HTTP 500 with a plain-text body such as
+# "HTTP 404 Not Found" or "Configuration not found".
+_NOT_FOUND_BODY = re.compile(r"\b404\b|not found", re.IGNORECASE)
+
+
+def _parse_datetime(value: Optional[Union[str, int, float]]) -> datetime:
+    """Parse an ISO-8601 string or epoch-milliseconds value, falling back to current UTC time."""
+    if value is None or value == "":
         return datetime.now(timezone.utc)
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
+    text = str(value)
+    if text.isdigit():
+        return datetime.fromtimestamp(int(text) / 1000, tz=timezone.utc)
+    return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
+def _response_text(response: Any) -> str:
+    """Return the response body as text ("" when unavailable)."""
+    text = getattr(response, "text", "")
+    return text if isinstance(text, str) else ""
+
+
+def _as_list(response: Any) -> List[dict]:
+    """Normalize an API response into a list of objects."""
+    if not response:
+        return []
+    return response if isinstance(response, list) else [response]
+
+
+def _to_id(value: Any) -> Union[int, str]:
+    """QuickBuild identifiers are numeric; send them as numbers when possible."""
+    text = str(value)
+    return int(text) if text.isdigit() else text
 
 
 class QuickBuildClient:
-    """Client for interacting with QuickBuild REST API"""
+    """Client for interacting with the QuickBuild REST API (JSON edition)"""
 
     def __init__(
         self,
@@ -45,9 +84,20 @@ class QuickBuildClient:
         if not self.password:
             raise ValueError("QB_PASSWORD environment variable is required")
 
+        self.auth_mode = os.getenv("QB_AUTH_MODE", "basic").strip().lower()
+        if self.auth_mode not in AUTH_MODES:
+            raise ValueError(
+                f"QB_AUTH_MODE must be one of {', '.join(AUTH_MODES)} (got '{self.auth_mode}')"
+            )
+
+        self.backup_dir = os.getenv("QB_BACKUP_DIR", "/opt/quickbuild/data/backup").rstrip("/")
+
         self.client = httpx.AsyncClient(
             timeout=30.0,
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            auth=httpx.BasicAuth(self.username, self.password) if self.auth_mode == "basic" else None,
+            # QuickBuild returns XML unless JSON is explicitly requested
+            headers={"Accept": "application/json"},
         )
         self.authenticated = False
 
@@ -91,6 +141,11 @@ class QuickBuildClient:
 
     async def authenticate(self) -> bool:
         """Authenticate with QuickBuild API"""
+        if self.auth_mode == "basic":
+            # Credentials travel with every request (HTTP Basic); there is no login call.
+            self.authenticated = True
+            return True
+
         try:
             auth_url = f"{self.base_url}/rest/authentication"
             response = await self.client.post(
@@ -142,14 +197,17 @@ class QuickBuildClient:
 
                 if response.status_code == 401:
                     self.authenticated = False
-                    if attempt < max_retries - 1:
+                    if self.auth_mode == "session" and attempt < max_retries - 1:
                         await self.authenticate()
                         continue
                     raise AuthenticationError(
-                        "Authentication failed with QuickBuild after retries",
+                        "Authentication failed with QuickBuild"
+                        + (" after retries" if self.auth_mode == "session" else " (check QB_USER/QB_PASSWORD)"),
                         ERROR_MAPPINGS[401],
                     )
-                if response.status_code == 404:
+                if response.status_code == 404 or (
+                    response.status_code >= 500 and _NOT_FOUND_BODY.search(_response_text(response))
+                ):
                     raise ResourceNotFoundError(
                         f"Resource not found: {endpoint}",
                         ERROR_MAPPINGS[404],
@@ -164,7 +222,7 @@ class QuickBuildClient:
                     )
                 if response.status_code >= 400:
                     raise QuickBuildError(
-                        f"API error: {response.status_code} - {response.text}",
+                        f"API error: {response.status_code} - {_response_text(response)}",
                         f"HTTP_{response.status_code}",
                     )
 
@@ -195,27 +253,28 @@ class QuickBuildClient:
         return await self._make_request("POST", endpoint, json=data)
 
     async def get_configurations(self) -> List[Configuration]:
-        """Get all build configurations"""
+        """Get all build configurations (GET /rest/configurations?recursive=true)"""
         cached = self._get_cached("configurations", self.cache_ttl_configs)
         if cached is not None:
             return cached
 
         try:
-            response = await self.get("configurations")
-            if not response:
-                return []
-
-            config_data = response if isinstance(response, list) else [response]
-            configurations = [
-                Configuration(
-                    id=str(config.get("id", "")),
-                    name=config.get("name", ""),
-                    description=config.get("description", ""),
-                    parent_id=str(config.get("parentId")) if config.get("parentId") else None,
-                    enabled=config.get("enabled", True),
+            response = await self.get("configurations", params={"recursive": "true"})
+            configurations = []
+            for config in _as_list(response):
+                parent = config.get("parent", config.get("parentId"))
+                enabled = (
+                    not config["disabled"] if "disabled" in config else config.get("enabled", True)
                 )
-                for config in config_data
-            ]
+                configurations.append(
+                    Configuration(
+                        id=str(config.get("id", "")),
+                        name=config.get("name", ""),
+                        description=config.get("description", ""),
+                        parent_id=str(parent) if parent is not None else None,
+                        enabled=bool(enabled),
+                    )
+                )
 
             self._set_cached("configurations", configurations, self.cache_ttl_configs)
             logger.info(f"Retrieved {len(configurations)} configurations")
@@ -225,52 +284,72 @@ class QuickBuildClient:
             logger.error(f"Error retrieving configurations: {e}")
             raise
 
+    @staticmethod
+    def _build_from(build_data: dict, config_id: str) -> Build:
+        """Map a QuickBuild build object to the Build model."""
+        status = str(build_data.get("status", ""))
+        start_value = build_data.get("beginDate", build_data.get("startTime"))
+        start_time = _parse_datetime(start_value)
+
+        end_time: Optional[datetime] = None
+        if build_data.get("endTime"):
+            end_time = _parse_datetime(build_data["endTime"])
+        elif build_data.get("duration") is not None and start_value and status.upper() != "RUNNING":
+            end_time = start_time + timedelta(milliseconds=int(build_data["duration"]))
+
+        return Build(
+            id=str(build_data.get("id", "")),
+            configuration_id=str(build_data.get("configuration", config_id)),
+            version=build_data.get("version", ""),
+            status=status,
+            start_time=start_time,
+            end_time=end_time,
+            success=status.upper() in SUCCESS_STATUSES,
+        )
+
     async def get_latest_build_status(self, config_id: str) -> Optional[Build]:
-        """Get latest build status for a configuration"""
+        """Get latest build of a configuration (GET /rest/latest_builds/{id}; 204 = no builds)"""
         try:
-            response = await self.get("builds", params={"configuration": config_id, "count": 1})
-
-            if not response or (isinstance(response, list) and len(response) == 0):
+            response = await self.get(f"latest_builds/{config_id}")
+            builds = _as_list(response)
+            if not builds:
                 return None
-
-            build_data = response[0] if isinstance(response, list) else response
-
-            return Build(
-                id=str(build_data.get("id", "")),
-                configuration_id=config_id,
-                version=build_data.get("version", ""),
-                status=build_data.get("status", ""),
-                start_time=_parse_datetime(build_data.get("startTime")),
-                end_time=_parse_datetime(build_data.get("endTime")) if build_data.get("endTime") else None,
-                success=build_data.get("status", "").lower() == "successful",
-            )
+            return self._build_from(builds[0], config_id)
 
         except Exception as e:
             logger.error(f"Error retrieving build status for config {config_id}: {e}")
             raise
 
+    @staticmethod
+    def _agent_from(agent: dict, default_status: str) -> Agent:
+        """Map a QuickBuild grid node object to the Agent model.
+
+        QuickBuild 16 grid nodes carry id/ip/port/hostName (no name or last-contact time;
+        "lastPulse" is only reported for unauthorized agents).
+        """
+        address = agent.get("address") or agent.get("nodeAddress") or ""
+        host, _, port = str(address).rpartition(":") if ":" in str(address) else (address, "", "")
+        return Agent(
+            name=agent.get("name") or agent.get("hostName") or address,
+            status=agent.get("status") or default_status,
+            last_contact=_parse_datetime(
+                agent.get("lastContact") or agent.get("lastPulse") or agent.get("lastPingDate")
+            ),
+            ip_address=agent.get("ipAddress") or agent.get("ip") or host,
+            port=int(agent.get("port") or port or 0),
+        )
+
     async def get_agents(self) -> List[Agent]:
-        """Get all build agents and their status"""
+        """Get build agents (GET /rest/buildagents/active and /rest/buildagents/inactive)"""
         cached = self._get_cached("agents", self.cache_ttl_agents)
         if cached is not None:
             return cached
 
         try:
-            response = await self.get("agents")
-            if not response:
-                return []
-
-            agent_data = response if isinstance(response, list) else [response]
-            agents = [
-                Agent(
-                    name=agent.get("name", ""),
-                    status=agent.get("status", "unknown"),
-                    last_contact=_parse_datetime(agent.get("lastContact")),
-                    ip_address=agent.get("ipAddress", ""),
-                    port=int(agent.get("port", 0)),
-                )
-                for agent in agent_data
-            ]
+            active = await self.get("buildagents/active")
+            inactive = await self.get("buildagents/inactive")
+            agents = [self._agent_from(a, "online") for a in _as_list(active)]
+            agents += [self._agent_from(a, "offline") for a in _as_list(inactive)]
 
             self._set_cached("agents", agents, self.cache_ttl_agents)
             logger.info(f"Retrieved {len(agents)} agents")
@@ -281,23 +360,22 @@ class QuickBuildClient:
             raise
 
     async def get_build_changes(self, build_id: str) -> List[Change]:
-        """Get SCM changes for a specific build"""
+        """Get SCM changesets of a build (GET /rest/changes/commits/build/{id})"""
         try:
-            response = await self.get(f"builds/{build_id}/changes")
-            if not response:
-                return []
-
-            change_data = response if isinstance(response, list) else [response]
-            changes = [
-                Change(
-                    revision=change.get("revision", ""),
-                    author=change.get("author", ""),
-                    message=change.get("message", ""),
-                    timestamp=_parse_datetime(change.get("timestamp")),
-                    files=change.get("files", []),
+            response = await self.get(f"changes/commits/build/{build_id}")
+            changes = []
+            for change in _as_list(response):
+                modifications = change.get("modifications") or []
+                files = [m.get("path", "") for m in modifications if isinstance(m, dict)]
+                changes.append(
+                    Change(
+                        revision=str(change.get("id", change.get("revision", ""))),
+                        author=change.get("user", change.get("author", "")),
+                        message=change.get("comment", change.get("message", "")),
+                        timestamp=_parse_datetime(change.get("date", change.get("timestamp"))),
+                        files=files or change.get("files", []),
+                    )
                 )
-                for change in change_data
-            ]
 
             logger.info(f"Retrieved {len(changes)} changes for build {build_id}")
             return changes
@@ -307,19 +385,26 @@ class QuickBuildClient:
             raise
 
     async def trigger_build(self, config_id: str, variables: Optional[dict] = None) -> dict:
-        """Trigger a new build for a configuration"""
+        """Request a new build (POST /rest/build_requests)"""
         try:
-            data: Dict[str, Any] = {"configurationId": config_id}
+            data: Dict[str, Any] = {
+                "configurationId": _to_id(config_id),
+                "respectBuildCondition": False,
+            }
             if variables:
                 data["variables"] = variables
 
-            response = await self.post("builds", data)
+            response = await self.post("build_requests", data)
+            response = response if isinstance(response, dict) else {}
 
-            build_id = response.get("id", "") if isinstance(response, dict) else ""
-            status = response.get("status", "QUEUED") if isinstance(response, dict) else "QUEUED"
+            request_id = response.get("requestId", "")
+            build_id = response.get("buildId", response.get("id", ""))
+            # QuickBuild answers 204 (no body) when the request is aggregated into an existing one
+            status = response.get("status") or ("QUEUED" if response else "AGGREGATED")
 
             result: Dict[str, Any] = {
-                "build_id": str(build_id),
+                "build_id": str(build_id) if build_id is not None else "",
+                "request_id": str(request_id),
                 "configuration_id": config_id,
                 "status": status,
                 "message": f"Build triggered successfully for configuration {config_id}",
@@ -327,7 +412,7 @@ class QuickBuildClient:
             if variables:
                 result["variables"] = variables
 
-            logger.info(f"Triggered build {build_id} for configuration {config_id}")
+            logger.info(f"Requested build for configuration {config_id} (request {request_id})")
             return result
 
         except Exception as e:
@@ -335,7 +420,7 @@ class QuickBuildClient:
             raise
 
     async def get_version(self) -> Dict[str, Any]:
-        """Get QuickBuild server version information"""
+        """Get QuickBuild server version information (GET /rest/version)"""
         try:
             response = await self.get("version")
             if isinstance(response, dict):
@@ -349,17 +434,30 @@ class QuickBuildClient:
             raise
 
     async def backup_database(self, backup_path: Optional[str] = None) -> Dict[str, Any]:
-        """Initiate a server-side QuickBuild database backup"""
+        """Back up the QuickBuild database on the server (POST /rest/backup)
+
+        backup_path is a path on the QuickBuild server; defaults to a timestamped zip in
+        QB_BACKUP_DIR (the server container's data volume).
+        """
         try:
-            data = {"backupPath": backup_path} if backup_path else None
+            target = backup_path or (
+                f"{self.backup_dir}/quickbuild-"
+                f"{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.zip"
+            )
+            data = {
+                "backupTo": target,
+                "excludeBuilds": False,
+                "excludeMeasurements": False,
+                "excludeAudits": False,
+                "clearPasswords": False,
+            }
             response = await self.post("backup", data)
 
             result: Dict[str, Any] = {
                 "status": "initiated",
                 "message": "Database backup initiated successfully",
+                "backup_path": target,
             }
-            if backup_path:
-                result["backup_path"] = backup_path
 
             if isinstance(response, dict):
                 result.update({k: v for k, v in response.items() if k != "raw"})
@@ -368,7 +466,7 @@ class QuickBuildClient:
             elif response:
                 result["details"] = str(response)
 
-            logger.info("Initiated QuickBuild database backup")
+            logger.info(f"Initiated QuickBuild database backup to {target}")
             return result
 
         except Exception as e:

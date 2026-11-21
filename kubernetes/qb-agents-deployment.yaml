@@ -1,4 +1,4 @@
-# QuickBuild 14 Build Agents Deployments
+# QuickBuild 16 Build Agents Deployments
 # Scalable build agents for different toolchains
 
 ---
@@ -31,7 +31,7 @@ spec:
       serviceAccountName: quickbuild-agent
       initContainers:
       - name: wait-for-server
-        image: busybox:1.35
+        image: busybox:1.37.0
         command: ['sh', '-c']
         args:
         - |
@@ -96,7 +96,7 @@ spec:
       serviceAccountName: quickbuild-agent
       initContainers:
       - name: wait-for-server
-        image: busybox:1.35
+        image: busybox:1.37.0
         command: ['sh', '-c']
         args:
         - |
@@ -173,7 +173,7 @@ spec:
       serviceAccountName: quickbuild-agent
       initContainers:
       - name: wait-for-server
-        image: busybox:1.35
+        image: busybox:1.37.0
         command: ['sh', '-c']
         args:
         - |
@@ -245,7 +245,7 @@ spec:
       serviceAccountName: quickbuild-agent
       initContainers:
       - name: wait-for-server
-        image: busybox:1.35
+        image: busybox:1.37.0
         command: ['sh', '-c']
         args:
         - |

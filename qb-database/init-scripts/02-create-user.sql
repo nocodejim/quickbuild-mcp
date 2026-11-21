@@ -1,4 +1,4 @@
--- QuickBuild 14 User Creation Script
+-- QuickBuild User Creation Script
 -- Creates dedicated qb_user for QuickBuild server connections
 -- Uses strong password and minimal required permissions
 

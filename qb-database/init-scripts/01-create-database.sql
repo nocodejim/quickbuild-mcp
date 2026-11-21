@@ -1,4 +1,4 @@
--- QuickBuild 14 Database Creation Script
+-- QuickBuild Database Creation Script
 -- Creates the main quickbuild database with proper configuration
 -- Executed during container initialization
 

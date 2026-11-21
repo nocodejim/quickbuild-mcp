@@ -79,12 +79,12 @@ class TestSystemFeature:
     @pytest.mark.asyncio
     async def test_handle_tool_call_get_version(self, feature):
         """Test getting QuickBuild server version"""
-        feature.qb_client.get_version.return_value = {"version": "14.0.32"}
+        feature.qb_client.get_version.return_value = {"version": "16.0.37"}
 
         result = await feature.handle_tool_call("system.get_version", {})
         data = json.loads(result)
 
-        assert data["version"] == "14.0.32"
+        assert data["version"] == "16.0.37"
         feature.qb_client.get_version.assert_called_once_with()
 
     @pytest.mark.asyncio

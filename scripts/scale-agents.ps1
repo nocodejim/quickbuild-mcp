@@ -1,4 +1,4 @@
-﻿# QuickBuild 14 Agent Scaling Script (PowerShell)
+﻿# QuickBuild Agent Scaling Script (PowerShell)
 # Provides easy scaling of build agents up or down
 # Supports different agent types and scaling strategies
 
@@ -146,7 +146,7 @@ function Scale-AllAgents {
 
 # Function to show scaling status
 function Show-Status {
-    Write-Host "QuickBuild 14 Agent Scaling Status" -ForegroundColor Blue
+    Write-Host "QuickBuild Agent Scaling Status" -ForegroundColor Blue
     Write-Host "=================================="
     
     $AgentTypes = @("base", "maven", "node", "dotnet")

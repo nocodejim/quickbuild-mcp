@@ -1,4 +1,4 @@
-# QuickBuild 14 - Simplified Quick Start
+# QuickBuild 16 - Simplified Quick Start
 
 ## TL;DR - Get Running Fast
 
@@ -9,10 +9,10 @@ docker run -d --name qb-db \
   -e ACCEPT_EULA=Y \
   -e SA_PASSWORD=TestPassword123! \
   -p 1433:1433 \
-  mcr.microsoft.com/mssql/server:2022-latest
+  mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04
 
 # Wait 30 seconds, then create QuickBuild database
-docker exec qb-db /opt/mssql-tools/bin/sqlcmd \
+docker exec qb-db /opt/mssql-tools18/bin/sqlcmd -C \
   -S localhost -U sa -P "TestPassword123!" \
   -Q "CREATE DATABASE quickbuild; CREATE LOGIN qb_user WITH PASSWORD = 'QBTestPassword123!'; USE quickbuild; CREATE USER qb_user FOR LOGIN qb_user; ALTER ROLE db_owner ADD MEMBER qb_user;"
 
@@ -88,7 +88,7 @@ docker exec qb-database ps aux | grep sql
 docker exec qb-database cat /var/opt/mssql/log/errorlog
 
 # Try connecting directly
-docker exec qb-database /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "TestPassword123!" -Q "SELECT @@VERSION"
+docker exec qb-database /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -Q "SELECT @@VERSION"
 ```
 
 ### 3. Custom Entrypoint Issue
@@ -103,11 +103,11 @@ docker run -d --name test-db \
   -e ACCEPT_EULA=Y \
   -e SA_PASSWORD=TestPassword123! \
   -p 1433:1433 \
-  mcr.microsoft.com/mssql/server:2022-latest
+  mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04
 
 # Test if this works
 sleep 30
-docker exec test-db /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "TestPassword123!" -Q "SELECT 1"
+docker exec test-db /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -Q "SELECT 1"
 ```
 
 ## For Jules - Cloud VM Specs
@@ -146,13 +146,13 @@ docker run -d --name qb-db \
   -e ACCEPT_EULA=Y \
   -e SA_PASSWORD=TestPassword123! \
   -p 1433:1433 \
-  mcr.microsoft.com/mssql/server:2022-latest
+  mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04
 
 echo "Waiting for SQL Server to start..."
 sleep 60
 
 echo "Creating QuickBuild database..."
-docker exec qb-db /opt/mssql-tools/bin/sqlcmd \
+docker exec qb-db /opt/mssql-tools18/bin/sqlcmd -C \
   -S localhost -U sa -P "TestPassword123!" \
   -Q "CREATE DATABASE quickbuild; CREATE LOGIN qb_user WITH PASSWORD = 'QBTestPassword123!'; USE quickbuild; CREATE USER qb_user FOR LOGIN qb_user; ALTER ROLE db_owner ADD MEMBER qb_user;"
 
@@ -202,7 +202,7 @@ docker-compose ps
 docker-compose logs
 
 # Test database connectivity
-docker exec qb-database /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "TestPassword123!" -Q "SELECT 1"
+docker exec qb-database /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -Q "SELECT 1"
 
 # Test QuickBuild web interface
 curl -I http://localhost:8810

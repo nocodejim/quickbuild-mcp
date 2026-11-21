@@ -1,6 +1,11 @@
-# QuickBuild 14 Multi-Container Deployment with Microsoft SQL Server
+# QuickBuild 16 Multi-Container Deployment with Microsoft SQL Server 2025
 # Complete Docker Compose orchestration for development and small production deployments
 # Includes database, server, and scalable build agents
+#
+# Image versions are pinned in the Dockerfiles; override them by exporting the build args
+# listed under each service (e.g. QB_VERSION + QB_DOWNLOAD_URL + QB_DOWNLOAD_SHA256, MSSQL_IMAGE).
+# Build the base agent image first: the toolchain agents are built FROM qb-agent-base:latest
+#   docker compose build qb-agent-base && docker compose build
 
 services:
   # Microsoft SQL Server Database
@@ -8,6 +13,8 @@ services:
     build:
       context: .
       dockerfile: ./qb-database/Dockerfile
+      args:
+        - MSSQL_IMAGE
     container_name: qb-database
     hostname: qb-database
     environment:
@@ -47,6 +54,13 @@ services:
     build:
       context: .
       dockerfile: ./qb-server/Dockerfile
+      args:
+        - JDK_IMAGE
+        - QB_VERSION
+        - QB_DOWNLOAD_URL
+        - QB_DOWNLOAD_SHA256
+        - MSSQL_JDBC_VERSION
+        - MSSQL_JDBC_SHA256
     container_name: qb-server
     hostname: qb-server
     environment:
@@ -61,6 +75,8 @@ services:
       - QB_LOG_LEVEL=${QB_LOG_LEVEL:-INFO}
     volumes:
       - qb-server-data:/opt/quickbuild/data
+      # Global storage directory (must be outside the install dir; enter this path in the setup wizard)
+      - qb-server-storage:/var/lib/quickbuild/storage
     networks:
       - qb-net
     ports:
@@ -89,10 +105,17 @@ services:
     build:
       context: .
       dockerfile: ./qb-agent/base/Dockerfile
+      args:
+        - JDK_IMAGE
+        - QB_VERSION
+        - QB_DOWNLOAD_URL
+        - QB_DOWNLOAD_SHA256
+    # Tagged so the maven/node/dotnet agent images can build FROM it
+    image: qb-agent-base:latest
     environment:
       - QB_SERVER_URL=http://qb-server:8810
       - AGENT_PORT=8811
-      - AGENT_NAME=base-agent-${COMPOSE_PROJECT_NAME:-quickbuild14}
+      - AGENT_NAME=base-agent-${COMPOSE_PROJECT_NAME:-quickbuild}
     networks:
       - qb-net
     depends_on:
@@ -117,7 +140,7 @@ services:
     environment:
       - QB_SERVER_URL=http://qb-server:8810
       - AGENT_PORT=8811
-      - AGENT_NAME=maven-agent-${COMPOSE_PROJECT_NAME:-quickbuild14}
+      - AGENT_NAME=maven-agent-${COMPOSE_PROJECT_NAME:-quickbuild}
       - MAVEN_OPTS=-Xmx1024m
     volumes:
       - qb-maven-cache:/opt/qb-agent/.m2/repository
@@ -145,7 +168,7 @@ services:
     environment:
       - QB_SERVER_URL=http://qb-server:8810
       - AGENT_PORT=8811
-      - AGENT_NAME=node-agent-${COMPOSE_PROJECT_NAME:-quickbuild14}
+      - AGENT_NAME=node-agent-${COMPOSE_PROJECT_NAME:-quickbuild}
     volumes:
       - qb-node-cache:/opt/qb-agent/.npm
       - qb-node-global:/opt/qb-agent/.npm-global
@@ -173,7 +196,7 @@ services:
     environment:
       - QB_SERVER_URL=http://qb-server:8810
       - AGENT_PORT=8811
-      - AGENT_NAME=dotnet-agent-${COMPOSE_PROJECT_NAME:-quickbuild14}
+      - AGENT_NAME=dotnet-agent-${COMPOSE_PROJECT_NAME:-quickbuild}
       - DOTNET_CLI_TELEMETRY_OPTOUT=1
       - DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
       - DOTNET_NOLOGO=1
@@ -207,6 +230,7 @@ services:
       - QB_URL=${QB_URL:-http://qb-server:8810}
       - QB_USER=${QB_USER:-admin}
       - QB_PASSWORD=${QB_PASSWORD:-admin}
+      - QB_AUTH_MODE=${QB_AUTH_MODE:-basic}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - MCP_PORT=${MCP_PORT:-14002}
       - QB_CACHE_TTL_CONFIGS=${QB_CACHE_TTL_CONFIGS:-300}
@@ -240,35 +264,38 @@ volumes:
   # Database volumes
   qb-db-data:
     driver: local
-    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_db_data
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild}_db_data
   qb-db-logs:
     driver: local
-    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_db_logs
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild}_db_logs
   
-  # Server volume
+  # Server volumes
   qb-server-data:
     driver: local
-    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_server_data
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild}_server_data
+  qb-server-storage:
+    driver: local
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild}_server_storage
   
   # Agent cache volumes
   qb-maven-cache:
     driver: local
-    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_maven_cache
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild}_maven_cache
   qb-node-cache:
     driver: local
-    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_node_cache
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild}_node_cache
   qb-node-global:
     driver: local
-    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_node_global
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild}_node_global
   qb-dotnet-packages:
     driver: local
-    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_dotnet_packages
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild}_dotnet_packages
 
 # Custom network for service communication
 networks:
   qb-net:
     driver: bridge
-    name: ${COMPOSE_PROJECT_NAME:-quickbuild14}_qb_net
+    name: ${COMPOSE_PROJECT_NAME:-quickbuild}_qb_net
     ipam:
       config:
         - subnet: ${QB_NETWORK_SUBNET:-172.20.0.0/16}

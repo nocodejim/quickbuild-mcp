@@ -2,7 +2,7 @@
 
 A unified repository combining:
 1. **QuickBuild MCP Server** (`src/`): A Python **Model Context Protocol (MCP v2)** server enabling AI agents and LLMs to inspect and automate QuickBuild CI/CD workflows.
-2. **QuickBuild 14 + Microsoft SQL Server 2022 Stack** (`qb-database/`, `qb-server/`, `qb-agent/`, `kubernetes/`, `scripts/`): Multi-tier containerized QuickBuild infrastructure with Docker Compose and Kubernetes support.
+2. **QuickBuild 16 + Microsoft SQL Server 2025 Stack** (`qb-database/`, `qb-server/`, `qb-agent/`, `kubernetes/`, `scripts/`): Multi-tier containerized QuickBuild infrastructure with Docker Compose and Kubernetes support.
 
 > See [TODO.md](TODO.md) for the full cleanup status and the roadmap for upgrading QuickBuild and MSSQL versions.
 
@@ -38,10 +38,16 @@ Configure `.env` (copied from `.env.example`):
 QB_URL=http://localhost:8810
 QB_USER=admin
 QB_PASSWORD=your_qb_password
+QB_AUTH_MODE=basic   # HTTP Basic on every request (QuickBuild REST API); "session" = legacy /rest/authentication login
 LOG_LEVEL=INFO
 QB_CACHE_TTL_CONFIGS=300
 QB_CACHE_TTL_AGENTS=30
 ```
+
+The client talks to the QuickBuild REST API (JSON edition, `Accept: application/json`) and was verified
+live against QuickBuild 16.0.37: `configurations?recursive=true`, `latest_builds/{id}`, `build_requests`,
+`buildagents/active|inactive`, `changes/commits/build/{id}`, `version`, and `backup`. QuickBuild 16 requires
+authentication even for `/rest/version`.
 
 ### Running Unit Tests
 
@@ -55,22 +61,33 @@ python run_tests.py
 
 ---
 
-## 2. QuickBuild 14 + Microsoft SQL Server 2022 Stack
+## 2. QuickBuild 16 + Microsoft SQL Server 2025 Stack
 
 ### Architecture Overview
 
-- **Database Tier (`qb-database/`):** Microsoft SQL Server 2022 (Linux container) with automated `quickbuild` database and `qb_user` initialization (`sqlcmd` supporting both `mssql-tools18` and `mssql-tools`).
-- **Application Tier (`qb-server/`):** QuickBuild 14 Server (Eclipse Temurin JDK 8) with dynamic `hibernate.properties` and `wrapper.conf` generation.
-- **Agent Tier (`qb-agent/`):** Scalable build agents (`base`, `maven`, `node`, `dotnet`).
+| Component | Version (pinned via Dockerfile build args) |
+|-----------|---------------------------------------------|
+| QuickBuild server & agents | 16.0.37 (`QB_VERSION`, `QB_DOWNLOAD_URL`, `QB_DOWNLOAD_SHA256`) |
+| Java | Eclipse Temurin 21 JDK on Ubuntu 24.04 (`JDK_IMAGE=eclipse-temurin:21-jdk-noble`) |
+| SQL Server | 2025 CU11 Express on Ubuntu 24.04 (`MSSQL_IMAGE`) |
+| SQL Server JDBC driver | 13.6.2.jre11 (`MSSQL_JDBC_VERSION`, `MSSQL_JDBC_SHA256`) |
+| Maven agent | Maven 3.9.16, compiles for Java 21 |
+| Node.js agent | Node.js 24.22.3 LTS via NVM v0.41.0 |
+| .NET agent | .NET SDK 10.0 LTS |
+
+- **Database Tier (`qb-database/`):** Microsoft SQL Server 2025 (Linux container) with automated `quickbuild` database and `qb_user` initialization (`sqlcmd` supporting both `mssql-tools18` and `mssql-tools`).
+- **Application Tier (`qb-server/`):** QuickBuild 16 Server (Temurin JDK 21) run by the bundled Java Service Wrapper, with `hibernate.properties` rendered from a template (Hibernate 5.4 `SQLServer2012Dialect`, HikariCP).
+- **Agent Tier (`qb-agent/`):** Scalable build agents (`base`, `maven`, `node`, `dotnet`); the base image assembles the build agent package from the QuickBuild distribution exactly like the server's own agent download.
 - **MCP Integration (`Dockerfile`):** Non-root Python 3.12 container running `mcp-quickbuild-server` on `qb-net`.
 - **Orchestration:** `docker-compose.yml` (+ `.dev.yml`, `.prod.yml`, `.scale.yml`) and `kubernetes/` manifests.
 
 ### Prerequisites
 
-- Docker Engine 20.10+ and Docker Compose v2+ (`docker compose`)
+- Docker Engine 20.10+ and Docker Compose v2+ (`docker compose`); BuildKit is not required
 - 4GB+ available RAM (8GB+ recommended for full stack)
 - 20GB+ available disk space
-- QuickBuild 14 server distribution placed in `environment/quickbuild-14.0.32/quickbuild-14.0.32/` and QuickBuild agent files in `qb-agent/base/quickbuild-agent/` (gitignored)
+- Internet access at build time (the QuickBuild 16 zip is downloaded and SHA-256 verified). For offline builds,
+  place `quickbuild-16.0.37.zip` or its unpacked folder in `environment/` (gitignored).
 
 ### Quick Start
 
@@ -81,7 +98,16 @@ cp .env.example .env
 # Update MSSQL_SA_PASSWORD, QB_DB_PASSWORD, and QB_PASSWORD in .env
 ```
 
-2. Choose your Docker Compose deployment mode:
+2. Build the images (the toolchain agents build `FROM qb-agent-base:latest`, so build it first):
+
+```bash
+docker compose build qb-agent-base && docker compose build
+```
+
+> If `docker compose up` fails with `Pool overlaps with other one on this address space`, set
+> `QB_NETWORK_SUBNET` (default `172.20.0.0/16`) to a free range in `.env`.
+
+3. Choose your Docker Compose deployment mode:
 
 | Mode | Command | Purpose |
 |------|---------|---------|
@@ -90,7 +116,17 @@ cp .env.example .env
 | **Scaling** | `docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d` | Replicated build agents with rolling update policies |
 | **Base** | `docker compose up -d` | Standard single-file compose stack |
 
-3. Access QuickBuild and validate:
+4. Complete the QuickBuild first-run setup wizard at `http://localhost:8810` (REST returns 404 until it is done):
+   - **Administrator:** create the account the MCP server uses (`QB_USER` / `QB_PASSWORD`).
+   - **URL to Access QuickBuild:** `http://qb-server:8810` (agents connect over the compose network).
+   - **Global Storage Directory:** `/var/lib/quickbuild/storage` (its own volume; QuickBuild rejects paths under its install dir `/opt/quickbuild`).
+   - **SMTP:** your mail host (required by the wizard).
+
+5. Authorize the build agents (QuickBuild 16 agents join the grid as *unauthorized*): use **Grid → Unauthorized Nodes**
+   in the web UI, or `curl -u admin:<password> "http://localhost:8810/rest/tokens/authorize?ip=<agent ip>&port=8811"`.
+   Set `QB_AGENT_TOKEN` per agent to keep an authorized identity when containers are recreated.
+
+6. Access QuickBuild and validate:
 
 - **Web Interface:** `http://localhost:8810`
 - **Validate deployment:** `./scripts/validate-deployment.sh -e docker-compose`
@@ -109,8 +145,8 @@ quickbuild-mcp/
 │   ├── quickbuild_client.py    # Async httpx client with retry & TTL cache
 │   └── server.py               # MCP Server core & request dispatch
 ├── tests/                      # Pytest unit test suite
-├── qb-database/                # MSSQL 2022 Dockerfile, entrypoint, healthcheck, SQL init
-├── qb-server/                  # QuickBuild 14 Dockerfile, entrypoint, config templates
+├── qb-database/                # MSSQL 2025 Dockerfile, entrypoint, healthcheck, SQL init
+├── qb-server/                  # QuickBuild 16 Dockerfile, entrypoint, dist fetcher, hibernate template
 ├── qb-agent/                   # Base, Maven, Node.js, and .NET agent images
 ├── kubernetes/                 # K8s manifests (Namespace, RBAC, StatefulSets, PVCs, Ingress)
 ├── scripts/                    # Operational scripts (backup, restore, scale, monitor, validate)

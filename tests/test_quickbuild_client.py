@@ -51,15 +51,16 @@ class TestQuickBuildClientInit:
 
 
 class TestQuickBuildClientAuthentication:
-    """Test authentication methods"""
+    """Test legacy session authentication (QB_AUTH_MODE=session)"""
     
     @pytest.fixture
     def client(self):
-        """Create client for testing"""
+        """Create session-mode client for testing"""
         with patch.dict(os.environ, {
             "QB_URL": "http://test:8810",
             "QB_USER": "testuser",
-            "QB_PASSWORD": "testpass"
+            "QB_PASSWORD": "testpass",
+            "QB_AUTH_MODE": "session"
         }):
             return QuickBuildClient()
     
@@ -131,9 +132,23 @@ class TestQuickBuildClientRequests:
             
             assert result == {"result": "success"}
     
+    @pytest.fixture
+    def session_client(self):
+        """Create authenticated session-mode client for testing"""
+        with patch.dict(os.environ, {
+            "QB_URL": "http://test:8810",
+            "QB_USER": "testuser",
+            "QB_PASSWORD": "testpass",
+            "QB_AUTH_MODE": "session"
+        }):
+            client = QuickBuildClient()
+            client.authenticated = True
+            return client
+
     @pytest.mark.asyncio
-    async def test_make_request_401_retry(self, authenticated_client):
-        """Test request with 401 triggers re-authentication"""
+    async def test_make_request_401_retry(self, session_client):
+        """Test request with 401 triggers re-authentication in session mode"""
+        authenticated_client = session_client
         # First call returns 401, second call succeeds
         mock_401_response = MagicMock()
         mock_401_response.status_code = 401
@@ -150,8 +165,9 @@ class TestQuickBuildClientRequests:
                 assert result == {"result": "success"}
     
     @pytest.mark.asyncio
-    async def test_make_request_401_exhausted(self, authenticated_client):
+    async def test_make_request_401_exhausted(self, session_client):
         """Test request with persistent 401 raises AuthenticationError after retries"""
+        authenticated_client = session_client
         mock_401_response = MagicMock()
         mock_401_response.status_code = 401
 
@@ -175,10 +191,13 @@ class TestQuickBuildClientRequests:
         """Test request with 500 error and retry"""
         mock_500_response = MagicMock()
         mock_500_response.status_code = 500
+        mock_500_response.text = "Internal Server Error"
         
-        with patch.object(authenticated_client.client, 'request', return_value=mock_500_response):
-            with pytest.raises(QuickBuildServerError):
-                await authenticated_client._make_request("GET", "test")
+        with patch.object(authenticated_client.client, 'request', return_value=mock_500_response) as mock_request:
+            with patch('src.quickbuild_client.asyncio.sleep', new_callable=AsyncMock):
+                with pytest.raises(QuickBuildServerError):
+                    await authenticated_client._make_request("GET", "test")
+            assert mock_request.call_count == 3
     
     @pytest.mark.asyncio
     async def test_make_request_connection_error_retry(self, authenticated_client):
@@ -329,13 +348,14 @@ class TestQuickBuildClientMethods:
             "port": 8810
         }]
         
-        with patch.object(authenticated_client, 'get', return_value=mock_response):
+        with patch.object(authenticated_client, 'get', side_effect=[mock_response, []]) as mock_get:
             agents = await authenticated_client.get_agents()
             
             assert len(agents) == 1
             assert isinstance(agents[0], Agent)
             assert agents[0].name == "agent-1"
             assert agents[0].status == "online"
+            assert [c.args[0] for c in mock_get.call_args_list] == ["buildagents/active", "buildagents/inactive"]
     
     @pytest.mark.asyncio
     async def test_get_build_changes(self, authenticated_client):
@@ -401,7 +421,13 @@ class TestQuickBuildClientMethods:
             assert result["status"] == "initiated"
             assert result["backup_path"] == "/backups/qb.zip"
             assert result["details"] == "/backups/qb.zip"
-            mock_post.assert_called_once_with("backup", {"backupPath": "/backups/qb.zip"})
+            mock_post.assert_called_once_with("backup", {
+                "backupTo": "/backups/qb.zip",
+                "excludeBuilds": False,
+                "excludeMeasurements": False,
+                "excludeAudits": False,
+                "clearPasswords": False,
+            })
 
     @pytest.mark.asyncio
     async def test_async_context_manager(self):

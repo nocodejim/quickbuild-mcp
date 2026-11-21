@@ -1,5 +1,5 @@
 #!/bin/bash
-# QuickBuild 14 Database Container Entrypoint
+# QuickBuild Database Container Entrypoint
 # Handles SQL Server startup and QuickBuild database initialization
 # Runs initialization scripts after SQL Server is ready
 
@@ -11,7 +11,7 @@ INIT_SCRIPTS_DIR="/opt/mssql-scripts"
 MAX_STARTUP_WAIT=120
 STARTUP_CHECK_INTERVAL=5
 
-echo "Starting QuickBuild 14 Database Container..."
+echo "Starting QuickBuild Database Container..."
 echo "SQL Server Version: $(grep VERSION= /etc/os-release | cut -d'"' -f2)"
 
 # Load secret file environment variables when provided (e.g. Docker secrets)

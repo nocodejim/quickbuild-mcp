@@ -1,5 +1,5 @@
 #!/bin/bash
-# QuickBuild 14 Agent Container Entrypoint
+# QuickBuild Agent Container Entrypoint
 # Handles agent registration, configuration, and startup
 # Implements auto-discovery and server connection
 
@@ -12,7 +12,7 @@ NODE_PROPERTIES="$AGENT_CONF_DIR/node.properties"
 MAX_SERVER_WAIT=300
 SERVER_CHECK_INTERVAL=10
 
-echo "Starting QuickBuild 14 Build Agent Container..."
+echo "Starting QuickBuild ${QB_VERSION:-} Build Agent Container..."
 echo "Agent Home: $QB_AGENT_HOME"
 
 # Function to validate environment variables
@@ -30,7 +30,7 @@ validate_environment() {
 
 # Function to detect container IP address
 detect_container_ip() {
-    echo "Detecting container IP address..."
+    echo "Detecting container IP address..." >&2
     
     # Try multiple methods to get container IP
     local container_ip=""
@@ -53,10 +53,10 @@ detect_container_ip() {
     # Default fallback
     if [ -z "$container_ip" ]; then
         container_ip="127.0.0.1"
-        echo "⚠ Could not detect container IP, using localhost"
+        echo "⚠ Could not detect container IP, using localhost" >&2
     fi
     
-    echo "✓ Container IP detected: $container_ip"
+    echo "✓ Container IP detected: $container_ip" >&2
     echo "$container_ip"
 }
 
@@ -108,38 +108,29 @@ generate_node_properties() {
     
     # Create conf directory if it doesn't exist
     mkdir -p "$AGENT_CONF_DIR"
-    
-    # Generate node.properties
-    cat > "$NODE_PROPERTIES" << EOF
-# QuickBuild 14 Agent Configuration
-# Generated automatically by container entrypoint
 
-# Server connection settings
-serverUrl=$QB_SERVER_URL
+    # QuickBuild 16 agents refuse to start without a "token" (a value without ':' marks a
+    # build agent). Use QB_AGENT_TOKEN, else keep the token from a previous start of this
+    # container, else generate one. New tokens must be authorized once on the server's Grid
+    # page or via GET /rest/tokens/authorize?ip=<agent ip>&port=<agent port>.
+    local agent_token="${QB_AGENT_TOKEN:-}"
+    if [ -z "$agent_token" ] && [ -f "$NODE_PROPERTIES" ]; then
+        agent_token="$(grep '^token=' "$NODE_PROPERTIES" | head -n 1 | cut -d= -f2-)"
+    fi
+    if [ -z "$agent_token" ]; then
+        agent_token="$(cat /proc/sys/kernel/random/uuid)"
+        echo "Generated new agent token (authorize this agent on the QuickBuild server)"
+    fi
 
-# Agent network settings
-ip=$container_ip
-port=${AGENT_PORT:-8811}
-
-# Agent identification
-name=$agent_name
-
-# Agent capabilities (will be detected automatically)
-# Additional properties can be added here
-
-# Logging settings
-logLevel=INFO
-
-# Performance settings
-maxConcurrentBuilds=2
-buildTimeout=3600
-
-# Security settings (if needed)
-# sslEnabled=false
-# keystorePath=
-# keystorePassword=
-
-EOF
+    # Generate node.properties (same keys as the server's buildagent download)
+    {
+        echo "# QuickBuild Agent Configuration"
+        echo "# Generated automatically by container entrypoint"
+        echo "serverUrl=$QB_SERVER_URL"
+        echo "ip=$container_ip"
+        echo "port=${AGENT_PORT:-8811}"
+        echo "token=$agent_token"
+    } > "$NODE_PROPERTIES"
 
     echo "✓ node.properties generated successfully"
     echo "Agent Name: $agent_name"
@@ -155,21 +146,37 @@ start_agent() {
     # Display configuration for debugging
     echo "Agent Configuration:"
     echo "==================="
-    cat "$NODE_PROPERTIES"
+    sed "s/^token=.*/token=********/" "$NODE_PROPERTIES"
     echo "==================="
     
     # Change to agent home directory
     cd "$QB_AGENT_HOME"
     
-    # Start QuickBuild agent
-    exec "$QB_AGENT_HOME/bin/agent.sh" console
+    local wrapper
+    case "$(uname -m)" in
+        x86_64|amd64) wrapper="$QB_AGENT_HOME/bin/wrapper-linux-x86-64" ;;
+        aarch64|arm64) wrapper="$QB_AGENT_HOME/bin/wrapper-linux-arm-64" ;;
+        *) echo "Error: unsupported CPU architecture $(uname -m)"; exit 1 ;;
+    esac
+
+    # Run the Java Service Wrapper in the foreground (equivalent to "bin/agent.sh console")
+    # as PID 1 so it receives SIGTERM directly and stops the JVM gracefully.
+    cd "$QB_AGENT_HOME/bin"
+    exec "$wrapper" ../conf/wrapper.conf \
+        wrapper.syslog.ident=buildagent \
+        wrapper.pidfile=./buildagent.pid \
+        wrapper.name=buildagent \
+        "wrapper.displayname=QuickBuild Build Agent" \
+        "wrapper.java.command=${JAVA_HOME:-/opt/java/openjdk}/bin/java" \
+        wrapper.console.flush=TRUE \
+        wrapper.script.version=3.5.49
 }
 
 # Function to display startup information
 display_startup_info() {
     echo ""
     echo "=========================================="
-    echo "QuickBuild 14 Build Agent Container"
+    echo "QuickBuild ${QB_VERSION:-} Build Agent Container"
     echo "=========================================="
     echo "Server URL: $QB_SERVER_URL"
     echo "Agent Port: ${AGENT_PORT:-8811}"

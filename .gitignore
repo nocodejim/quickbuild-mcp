@@ -1,5 +1,6 @@
 # QuickBuild installations (keep our docs and specs)
 environment/quickbuild-*/
+environment/quickbuild-*.zip
 qb-server/quickbuild-*/
 qb-agent/*/quickbuild-agent/
 

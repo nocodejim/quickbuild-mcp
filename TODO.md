@@ -41,25 +41,48 @@ This checklist tracks all issues uncovered during the deep repository review on 
 
 ---
 
-## Phase 2: QuickBuild & Microsoft SQL Server Version Upgrades (Next Up)
+## Phase 2: QuickBuild & Microsoft SQL Server Version Upgrades (Done on `upgrade/qb-mssql-phase2`)
+
+Verified live in an isolated compose project: SQL Server 2025 CU11 init + healthcheck, QuickBuild 16.0.37 on
+JDK 21 (35 `QB_*` tables created by Hibernate), first-run setup wizard, base/maven/node/dotnet agents authorized
+and online, and every MCP tool/resource over the stdio wire protocol against the live server.
 
 ### QuickBuild Server & Agent Upgrade
-- [ ] Decide target QuickBuild version (e.g., QuickBuild 15.x / 16.x) and verify official Java runtime requirement (upgrade `eclipse-temurin:8-jdk-focal` in `qb-server/Dockerfile` and `qb-agent/base/Dockerfile` to `eclipse-temurin:17-jdk-noble` or `eclipse-temurin:21-jdk-noble`).
-- [ ] Update QuickBuild distribution binaries in `environment/` and `qb-agent/base/quickbuild-agent/`, and update `QB_VERSION` / `LABEL version` across `qb-server/Dockerfile`, `qb-agent/*/Dockerfile`, `kubernetes/*.yaml`, and scripts.
-- [ ] Verify QuickBuild REST API endpoints (`/rest/authentication`, `/rest/configurations`, `/rest/builds`, `/rest/agents`, `/rest/builds/{id}/changes`, `/rest/version`, `/rest/backup`) against the target QuickBuild release (especially auth method — Basic Auth / Bearer Token vs `/rest/authentication` session login, and JSON response schemas).
-- [ ] Review `qb-server/hibernate.properties.template` Hibernate dialect (`SQLServer2012Dialect` -> `SQLServer2016Dialect` or Hibernate 6 `SQLServerDialect` depending on the QuickBuild release).
-- [ ] Decide whether `qb-server/entrypoint.sh` should continue launching `com.pmease.quickbuild.bootstrap.Bootstrap` directly or use `server.sh` / updated Java Service Wrapper.
+- [x] Decide target QuickBuild version: **16.0.37** (released 2026-11-19; QB 15+ requires Java 11+, QB 16 supports up to Java 25). Base images moved from `eclipse-temurin:8-jdk-focal` to `eclipse-temurin:21-jdk-noble` (`ARG JDK_IMAGE`).
+- [x] Distribution sourcing: `qb-server/fetch-quickbuild-dist.sh` uses `environment/quickbuild-${QB_VERSION}/`, then `environment/quickbuild-${QB_VERSION}.zip`, then downloads `QB_DOWNLOAD_URL` (SHA-256 verified via `QB_DOWNLOAD_SHA256`). Multi-stage builds keep the copied/downloaded archive out of the final image.
+- [x] Base agent image assembles the build agent package from the server distribution, file-for-file identical to the server's own `/download/buildagent.tar.gz` (or uses an extracted package in `qb-agent/base/quickbuild-agent/`).
+- [x] `QB_VERSION` / `LABEL version` updated across `qb-server/Dockerfile`, `qb-agent/*/Dockerfile`, `kubernetes/*.yaml`, scripts, and compose files.
+- [x] Verify QuickBuild REST API against 16.0.37: no `/rest/authentication` (HTTP Basic on every request; `/rest/version` also needs auth in QB16); JSON requires `Accept: application/json`; endpoints are `configurations?recursive=true`, `latest_builds/{id}` (204 = no builds), `POST build_requests` (returns `requestId`), `buildagents/active|inactive`, `changes/commits/build/{id}`, `version` (text), `POST backup` (`BackupNowOption`). Missing resources come back as HTTP 500 with a "not found" body.
+- [x] Hibernate dialect: QuickBuild 16 bundles Hibernate 5.4, where `SQLServer2012Dialect` is the newest SQL Server dialect (and what QB ships). Template now mirrors QB16's shipped settings (HikariCP pool, EhCache provider) instead of the old c3p0/Hibernate 3 settings.
+- [x] Launch method: entrypoints now `exec` the bundled Java Service Wrapper with the distribution's own `conf/wrapper.conf` (equivalent to `bin/server.sh console`) as PID 1 for graceful `docker stop`; the hand-built classpath launch and the incorrect `wrapper.conf.template` were removed. `wrapper.conf`/`wrapper-license.conf` are refreshed from the image on every start (they reference versioned jars).
+- [x] QuickBuild 16 requires a Global Storage Directory outside its install dir: added `/var/lib/quickbuild/storage` (`qb-server-storage` volume, k8s `subPath`, backup/restore scripts).
+- [x] QuickBuild 16 agents require a `token` in `node.properties`: agent entrypoint uses `QB_AGENT_TOKEN`, keeps an existing token across restarts, or generates one; new agents are authorized via Grid page or `GET /rest/tokens/authorize?ip=&port=`.
 
 ### Microsoft SQL Server Upgrade
-- [ ] Update `qb-database/Dockerfile` base image from `mcr.microsoft.com/mssql/server:2022-latest` to target MSSQL tag (e.g., `mcr.microsoft.com/mssql/server:2025-latest` or pinned `2022-CU*` / `2025-CU*` tag).
-- [ ] Update `MSSQL_JDBC_VERSION` in `qb-server/Dockerfile` from `12.4.2.jre8` to the latest JDBC driver matching the upgraded JRE (e.g., `12.8.x.jre17` / `13.x.jre17`), and replace `|| echo "Warning..."` with a strict build failure + checksum verification so a broken JDBC download fails fast at build time.
-- [ ] Test `qb-database/init-scripts/*.sql` and `qb-database/healthcheck.sh` against the upgraded SQL Server image (verifying `ACCEPT_EULA`, `MSSQL_SA_PASSWORD`, `mssql-tools18`, and TLS certificate defaults).
+- [x] `qb-database/Dockerfile` base image is `ARG MSSQL_IMAGE=mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04` (2025 Express on Ubuntu 24.04; 2022 tags still work via the build arg).
+- [x] JDBC: `mssql-jdbc-13.6.2.jre11` from Maven Central with `MSSQL_JDBC_SHA256` verification and no silent fallback. The driver now replaces the bundled `mssql-jdbc-7.4.1.jre8.jar` in the `com.pmease.quickbuild.libs` OSGi bundle (and its `Bundle-ClassPath`); the old Dockerfile wrote to a `/opt/quickbuild/lib/` directory QuickBuild never loads.
+- [x] `qb-database/init-scripts/*.sql` and `healthcheck.sh` tested on SQL Server 2025 CU11 (`mssql-tools18 -C`, `MSSQL_SA_PASSWORD`/`SA_PASSWORD`, TLS defaults): healthy in ~15s, `qb_user` connects.
 
 ### Agent Base OS & Toolchain Upgrades (EOL Cleanup)
-- [ ] Upgrade Ubuntu base from `focal` (20.04, EOL) to `noble` (24.04) across `qb-server/Dockerfile` and `qb-agent/base/Dockerfile` (and update `ubuntu:20.04` helper container in `scripts/backup.sh`, `scripts/backup.ps1`, `scripts/restore.sh` to `ubuntu:24.04` or `alpine`).
-- [ ] Upgrade Node.js agent (`qb-agent/node/Dockerfile`) from EOL Node `16.20.2` to active LTS (Node `22.x` or `24.x`) and update NVM version.
-- [ ] Upgrade .NET agent (`qb-agent/dotnet/Dockerfile` & `qb-agent/dotnet/config/global.json`) from EOL `.NET 6.0` (and `ubuntu/20.04` repo + `libssl1.1`/`libicu66`) to `.NET 8.0` or `.NET 9.0` LTS on Ubuntu 24.04.
-- [ ] Upgrade Maven agent (`qb-agent/maven/Dockerfile` & `qb-agent/maven/config/settings.xml`) from Maven `3.8.8` to `3.9.x` and compiler source/target from Java `8` to target JDK.
+- [x] Ubuntu `focal` -> `noble` (24.04) for server and agents (removes the stock `ubuntu` UID 1000 user, `netcat` -> `netcat-openbsd`); backup/restore helper image `ubuntu:20.04` -> `ubuntu:24.04`.
+- [x] Node.js agent: Node `24.22.3` LTS via NVM `v0.41.0` (Node 22 is maintenance-only until Apr 2027); removed deprecated `create-react-app` and `@vue/cli`; removed the npm `prefix` setting in `.npmrc`, which NVM refuses to work with (it broke the image build and the agent entrypoint).
+- [x] .NET agent: .NET SDK **10.0** LTS (.NET 8/9 reached end of support 2026-11-10) copied from `mcr.microsoft.com/dotnet/sdk:10.0-noble`; noble runtime deps (`libicu74`, `libssl3t64`); `global.json` -> `10.0.100` + `latestFeature`.
+- [x] Maven agent: Maven `3.9.16` (SHA-512 verified), compiler `release`/`source`/`target` 21.
+- [x] Replaced BuildKit-only `COPY --chmod` (classic builder is used on hosts without buildx); toolchain agents build `FROM ${BASE_IMAGE:-qb-agent-base:latest}` and compose tags the base image accordingly.
+- [x] Kubernetes: `busybox:1.35` -> `1.37.0`, version labels -> `16.0`.
+- [x] Operational scripts: `validate-deployment.sh` / `health-check.sh` follow QuickBuild 16's `/` -> `/dashboard` redirect; `/rest/version` checks send `QB_USER`/`QB_PASSWORD` (required by QB16) and parse the plain-text version; `migrate-from-existing.sh` reads the version from `asset/release`.
+
+### MCP Server API Compatibility
+- [x] `QB_AUTH_MODE=basic|session` (default `basic`, `httpx.BasicAuth`); `session` keeps the legacy `/rest/authentication` flow. Basic-mode 401s fail fast without re-authentication loops.
+- [x] Client remapped to the QuickBuild 16 endpoints and JSON shapes above (models and MCP tool output shapes unchanged; `builds.trigger` adds `request_id`). New contract tests in `tests/test_quickbuild_client_qb16.py` replay payloads captured from the live server.
+
+### Follow-ups found during Phase 2
+- [ ] Default `QB_NETWORK_SUBNET=172.20.0.0/16` collides with existing Docker networks on some hosts; hard-coded `container_name`s and the `qb-bridge` bridge name prevent running two stacks side by side.
+- [ ] `qb-node-global` volume / `/opt/qb-agent/.npm-global` PATH entry are now unused (npm `prefix` removed for NVM compatibility).
+- [ ] Changeset JSON mapping (`changes/commits/build/{id}`) follows the documented structure; verify against a build with real SCM changes.
+- [ ] `kubernetes/configmap.yaml` `JAVA_OPTS` is not consumed by the server image (use `QB_JAVA_MAX_MEMORY_MB` or extend the entrypoint).
+- [ ] Persistent custom JVM flags: `conf/wrapper.conf` is refreshed from the image on start; consider an env hook for extra `wrapper.java.additional.N` flags.
+- [ ] Optional: QuickBuild access-token REST authentication (QB 12+) as a third `QB_AUTH_MODE`.
 
 ---
 
@@ -67,7 +90,7 @@ This checklist tracks all issues uncovered during the deep repository review on 
 
 - [ ] **MCP HTTP/Streamable Transport:** Add optional Streamable HTTP transport (`server.streamable_http_app()` / `uvicorn`) behind an env flag (e.g. `MCP_TRANSPORT=stdio|http`) so `mcp-quickbuild-server` can serve remote clients on port `14002` in addition to `stdio`.
 - [ ] **Additional MCP Tools & Resources:** Implement remaining design/oracle items (`configurations.create`, build cancellation, build log streaming/tailing, JUnit test report resource, agent authorization).
-- [ ] **Auth & Config Hardening:** Support QuickBuild API tokens / Basic Auth in `QuickBuildClient` alongside session auth, and add explicit TLS verification options (`QB_VERIFY_SSL`).
-- [ ] **Kubernetes Hardening:** Update `kubernetes/` manifests (`busybox:1.35` -> `1.36+`, replace placeholder secrets/images, add `mcp-quickbuild-server` Deployment/Service if desired, check `ReadWriteMany` PVC requirements).
+- [ ] **Auth & Config Hardening:** Basic auth is done (Phase 2); add QuickBuild access-token auth and explicit TLS verification options (`QB_VERIFY_SSL`).
+- [ ] **Kubernetes Hardening:** Update `kubernetes/` manifests (busybox bumped to 1.37.0 in Phase 2; replace placeholder secrets/images, add `mcp-quickbuild-server` Deployment/Service if desired, check `ReadWriteMany` PVC requirements).
 - [ ] **CI/CD Automation:** Add `.github/workflows/ci.yml` running `pytest`, `ruff`/`mypy`, `docker compose config`, `bash -n` / `shellcheck`, and Trivy image scanning on PRs.
 - [ ] **Live End-to-End Test Suite:** Add an integration test suite verifying MSSQL init -> QuickBuild server startup -> agent registration -> MCP tool & resource calls against the live stack.

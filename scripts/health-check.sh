@@ -1,5 +1,5 @@
 #!/bin/bash
-# QuickBuild 14 Health Check Utility
+# QuickBuild Health Check Utility
 # Comprehensive health checking for individual components
 # Can be used for external monitoring systems and alerting
 
@@ -186,8 +186,8 @@ check_database_health() {
 check_server_health() {
     log "Checking QuickBuild server health..."
     
-    # Basic HTTP connectivity
-    local http_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time $TIMEOUT "$QB_URL" 2>/dev/null || echo "000")
+    # Basic HTTP connectivity (follow redirects: QuickBuild 16 redirects / to /dashboard or /setup)
+    local http_status=$(curl -s -L -o /dev/null -w "%{http_code}" --max-time $TIMEOUT "$QB_URL" 2>/dev/null || echo "000")
     if [[ "$http_status" == "200" ]]; then
         success "QuickBuild server HTTP interface is accessible"
         add_detail "server_http_accessible=true"
@@ -201,7 +201,14 @@ check_server_health() {
     fi
     
     # Version information
-    local version=$(curl -s --max-time $TIMEOUT "$QB_URL/rest/version" 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+    # QuickBuild 16 requires authentication for /rest/version and answers in plain text
+    local -a qb_auth=()
+    if [[ -n "${QB_PASSWORD:-}" ]]; then
+        qb_auth=(-u "${QB_USER:-admin}:${QB_PASSWORD}")
+    fi
+    local version
+    version=$(curl -s --max-time $TIMEOUT "${qb_auth[@]}" "$QB_URL/rest/version" 2>/dev/null | grep -oE '^[0-9]+(\.[0-9]+)+' || true)
+    version="${version:-unknown}"
     if [[ "$version" != "unknown" ]]; then
         success "QuickBuild version: $version"
         add_detail "server_version=$version"

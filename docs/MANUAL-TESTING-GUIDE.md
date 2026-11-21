@@ -1,11 +1,11 @@
-# QuickBuild 14 Containerization - Manual Testing Guide
+# QuickBuild 16 Containerization - Manual Testing Guide
 
 ## Overview
-This guide provides step-by-step instructions for manually testing and troubleshooting the QuickBuild 14 containerized deployment.
+This guide provides step-by-step instructions for manually testing and troubleshooting the QuickBuild 16 containerized deployment.
 
 ## Prerequisites
 - Docker and Docker Compose installed
-- QuickBuild 14.0.32 installation files in `environment/quickbuild-14.0.32/`
+- QuickBuild 16 distribution (downloaded at build time, or placed in `environment/quickbuild-16.0.37/` or `environment/quickbuild-16.0.37.zip`)
 - At least 8GB RAM and 4 CPU cores recommended
 - Windows/Linux/macOS with Docker Desktop
 
@@ -23,7 +23,7 @@ docker-compose up -d qb-database
 docker-compose logs -f qb-database
 
 # Test database connectivity
-docker exec -it qb-database /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "TestPassword123!" -Q "SELECT @@VERSION"
+docker exec -it qb-database /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -Q "SELECT @@VERSION"
 ```
 
 ### 2. Server-Only Testing (with external DB)
@@ -75,7 +75,7 @@ docker-compose logs
      -e ACCEPT_EULA=Y \
      -e SA_PASSWORD=TestPassword123! \
      -p 1433:1433 \
-     mcr.microsoft.com/mssql/server:2022-latest
+     mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04
    ```
 
 3. **Manual database setup**:
@@ -98,7 +98,7 @@ docker-compose logs
 **Solutions**:
 1. **Check Java classpath**:
    ```bash
-   docker exec -it qb-server ls -la /opt/quickbuild/lib/
+   docker exec -it qb-server ls -la /opt/quickbuild/plugins/com.pmease.quickbuild.libs/
    docker exec -it qb-server ls -la /opt/quickbuild/plugins/
    ```
 
@@ -123,10 +123,10 @@ docker run -d --name manual-qb-db \
   -e ACCEPT_EULA=Y \
   -e SA_PASSWORD=TestPassword123! \
   -p 1433:1433 \
-  mcr.microsoft.com/mssql/server:2022-latest
+  mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04
 
 # Wait for startup, then create database
-docker exec -it manual-qb-db /opt/mssql-tools/bin/sqlcmd \
+docker exec -it manual-qb-db /opt/mssql-tools18/bin/sqlcmd -C \
   -S localhost -U sa -P "TestPassword123!" \
   -Q "CREATE DATABASE quickbuild; CREATE LOGIN qb_user WITH PASSWORD = 'QBTestPassword123!'; USE quickbuild; CREATE USER qb_user FOR LOGIN qb_user; ALTER ROLE db_owner ADD MEMBER qb_user;"
 ```

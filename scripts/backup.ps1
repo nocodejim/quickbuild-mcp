@@ -1,4 +1,4 @@
-# QuickBuild 14 Backup Script (PowerShell)
+# QuickBuild Backup Script (PowerShell)
 # Comprehensive backup solution for Docker Compose and Kubernetes deployments
 # Windows-compatible version of backup.sh
 
@@ -92,7 +92,7 @@ function Backup-DockerCompose {
         docker run --rm `
             -v "${dbDataVolume}:/source:ro" `
             -v "${BackupPath}:/backup" `
-            ubuntu:20.04 `
+            ubuntu:24.04 `
             tar czf "/backup/database/db_data_${Timestamp}.tar.gz" -C /source .
         Write-Success "Database data backup completed"
     } else {
@@ -106,7 +106,7 @@ function Backup-DockerCompose {
         docker run --rm `
             -v "${dbLogsVolume}:/source:ro" `
             -v "${BackupPath}:/backup" `
-            ubuntu:20.04 `
+            ubuntu:24.04 `
             tar czf "/backup/database/db_logs_${Timestamp}.tar.gz" -C /source .
         Write-Success "Database logs backup completed"
     }
@@ -118,11 +118,25 @@ function Backup-DockerCompose {
         docker run --rm `
             -v "${serverDataVolume}:/source:ro" `
             -v "${BackupPath}:/backup" `
-            ubuntu:20.04 `
+            ubuntu:24.04 `
             tar czf "/backup/server/server_data_${Timestamp}.tar.gz" -C /source .
         Write-Success "Server data backup completed"
     } else {
         Write-Warning-Log "Server data volume not found"
+    }
+
+    # Backup server global storage (build artifacts/reports; QuickBuild 16 storage directory)
+    Write-Log "Backing up server storage..."
+    $serverStorageVolume = "${Project}_server_storage"
+    if (docker volume ls | Select-String $serverStorageVolume) {
+        docker run --rm `
+            -v "${serverStorageVolume}:/source:ro" `
+            -v "${BackupPath}:/backup" `
+            ubuntu:24.04 `
+            tar czf "/backup/server/server_storage_${Timestamp}.tar.gz" -C /source .
+        Write-Success "Server storage backup completed"
+    } else {
+        Write-Warning-Log "Server storage volume not found"
     }
     
     # Backup agent caches
@@ -134,7 +148,7 @@ function Backup-DockerCompose {
             docker run --rm `
                 -v "${volumeName}:/source:ro" `
                 -v "${BackupPath}:/backup" `
-                ubuntu:20.04 `
+                ubuntu:24.04 `
                 tar czf "/backup/server/${cache}_cache_${Timestamp}.tar.gz" -C /source .
             Write-Success "$cache cache backup completed"
         }
@@ -177,7 +191,7 @@ function Backup-Metadata {
         namespace = $Namespace
         compose_project = $Project
         backup_version = "1.0"
-        quickbuild_version = "14.0"
+        quickbuild_version = "16.0"
         backup_type = "full"
         compressed = $Compress.IsPresent
         validated = $Validate.IsPresent

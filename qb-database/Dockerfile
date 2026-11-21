@@ -1,9 +1,12 @@
-# Microsoft SQL Server Database Container for QuickBuild 14
-# Base: Microsoft SQL Server 2022 Linux Container
+# Microsoft SQL Server Database Container for QuickBuild 16
+# Base: Microsoft SQL Server 2025 Linux container (Ubuntu 24.04, mssql-tools18)
+#   Override with: --build-arg MSSQL_IMAGE=mcr.microsoft.com/mssql/server:2025-latest
+#   (or a 2022 tag such as mcr.microsoft.com/mssql/server:2022-latest)
 # Security: Runs with default MSSQL user, volume-based persistence
 # Health: sqlcmd-based health checks
 
-FROM mcr.microsoft.com/mssql/server:2022-latest
+ARG MSSQL_IMAGE=mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04
+FROM ${MSSQL_IMAGE}
 
 # Set environment variables for SQL Server
 ENV ACCEPT_EULA=Y

@@ -1,5 +1,5 @@
 #!/bin/bash
-# QuickBuild 14 Database Health Check Script
+# QuickBuild Database Health Check Script
 # Verifies SQL Server is running and accepting connections
 # Used by Docker health check mechanism
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# QuickBuild 14 Deployment Validation Script
+# QuickBuild Deployment Validation Script
 # Comprehensive validation of containerized QuickBuild deployment
 # Verifies system health, connectivity, and proper operation
 
@@ -167,7 +167,7 @@ check_http_endpoint() {
     local url="$1"
     local expected_status="${2:-200}"
     
-    local status=$(curl -s -o /dev/null -w "%{http_code}" --max-time $TIMEOUT "$url" 2>/dev/null || echo "000")
+    local status=$(curl -s -L -o /dev/null -w "%{http_code}" --max-time $TIMEOUT "$url" 2>/dev/null || echo "000")
     
     if [[ "$status" == "$expected_status" ]]; then
         return 0
@@ -343,18 +343,30 @@ validate_quickbuild_functionality() {
             ;;
     esac
     
-    # Test QuickBuild REST API
+    # Test QuickBuild REST API (QuickBuild 16 requires authentication even for /rest/version,
+    # and returns a plain-text version string)
     test_start "QuickBuild REST API"
-    if check_http_endpoint "$qb_url/rest/version"; then
+    local -a qb_auth=()
+    if [[ -n "${QB_PASSWORD:-}" ]]; then
+        qb_auth=(-u "${QB_USER:-admin}:${QB_PASSWORD}")
+    fi
+    local rest_status
+    rest_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time $TIMEOUT "${qb_auth[@]}" "$qb_url/rest/version" 2>/dev/null || echo "000")
+    if [[ "$rest_status" == "200" ]]; then
         test_pass "QuickBuild REST API is accessible"
         
         # Get version information
-        local version=$(curl -s --max-time $TIMEOUT "$qb_url/rest/version" 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
-        if [[ "$version" != "unknown" ]]; then
+        local version
+        version=$(curl -s --max-time $TIMEOUT "${qb_auth[@]}" "$qb_url/rest/version" 2>/dev/null | grep -oE '^[0-9]+(\.[0-9]+)+' || true)
+        if [[ -n "$version" ]]; then
             log "QuickBuild version: $version"
         fi
+    elif [[ "$rest_status" == "401" ]]; then
+        test_pass "QuickBuild REST API is reachable (set QB_USER/QB_PASSWORD to query the version)"
+    elif [[ "$rest_status" == "404" ]]; then
+        test_fail "QuickBuild REST API returned 404 (complete the first-run setup wizard in the web UI)"
     else
-        test_fail "QuickBuild REST API is not accessible"
+        test_fail "QuickBuild REST API is not accessible (HTTP $rest_status)"
     fi
     
     # Test agent connectivity (if agents are running)

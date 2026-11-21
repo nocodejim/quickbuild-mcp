@@ -1,4 +1,4 @@
-# QuickBuild 14 Kubernetes RBAC Configuration
+# QuickBuild 16 Kubernetes RBAC Configuration
 # Service accounts, roles, and bindings for QuickBuild components
 
 ---

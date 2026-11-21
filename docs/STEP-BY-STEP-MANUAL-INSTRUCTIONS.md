@@ -1,4 +1,4 @@
-# QuickBuild 14 - Step-by-Step Manual Instructions
+# QuickBuild 16 - Step-by-Step Manual Instructions
 
 ## ⚠️ SAFETY FIRST - READ THIS
 **NEVER run destructive system-wide commands like:**
@@ -14,7 +14,7 @@
 - Docker and Docker Compose installed
 - At least 8GB RAM available
 - Ports 8810 and 1433 available
-- QuickBuild 14.0.32 files in `environment/quickbuild-14.0.32/`
+- QuickBuild 16 distribution (downloaded at build time, or placed in `environment/quickbuild-16.0.37/` or `environment/quickbuild-16.0.37.zip`)
 
 ## Step 1: Clean Environment
 ```bash
@@ -40,7 +40,7 @@ docker run -d \
   -e ACCEPT_EULA=Y \
   -e SA_PASSWORD=TestPassword123! \
   -p 1433:1433 \
-  mcr.microsoft.com/mssql/server:2022-latest
+  mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04
 
 # Wait for SQL Server to start (important!)
 echo "Waiting 90 seconds for SQL Server to fully start..."
@@ -203,7 +203,7 @@ docker run -d \
   -e ACCEPT_EULA=Y \
   -e SA_PASSWORD=TestPassword123! \
   -p 1433:1433 \
-  mcr.microsoft.com/mssql/server:2022-latest
+  mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04
 
 # Wait and setup database (repeat Step 3)
 sleep 90
@@ -281,9 +281,9 @@ docker rm qb-server qb-database
 docker network rm qb-network
 
 # Remove QuickBuild images (optional - only if you want to free space)
-docker rmi quickbuild14-test-qb-server mcr.microsoft.com/mssql/server:2022-latest
+docker rmi quickbuild14-test-qb-server mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04
 
 # WARNING: Never run 'docker system prune -f' as it removes ALL unused Docker resources system-wide
 ```
 
-Follow these steps in order, and you should have a working QuickBuild 14 containerized environment!
+Follow these steps in order, and you should have a working QuickBuild 16 containerized environment!

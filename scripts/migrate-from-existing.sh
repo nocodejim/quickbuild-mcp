@@ -1,5 +1,5 @@
 #!/bin/bash
-# QuickBuild 14 Migration Script
+# QuickBuild Migration Script
 # Migrates data from existing QuickBuild installation to containerized deployment
 # Supports migration of configuration, build history, and user data
 
@@ -131,14 +131,26 @@ detect_quickbuild_installation() {
         version_file="$SOURCE_PATH/VERSION"
     fi
     
+    if [[ -z "$version_file" && -f "$SOURCE_PATH/asset/release" ]]; then
+        # QuickBuild records its version as "version=X.Y.Z" in asset/release
+        version_file="$SOURCE_PATH/asset/release"
+    fi
+    
     if [[ -n "$version_file" ]]; then
-        local version=$(cat "$version_file" | head -1)
+        local version
+        if grep -q '^version=' "$version_file"; then
+            version=$(grep '^version=' "$version_file" | head -1 | cut -d= -f2)
+        else
+            version=$(head -1 "$version_file")
+        fi
         log "Detected QuickBuild version: $version"
         
         # Check if version is compatible
-        if [[ ! "$version" =~ ^14\. ]]; then
-            warning "Source version ($version) may not be fully compatible with QuickBuild 14 containers"
+        if [[ ! "$version" =~ ^1[4-6]\. ]]; then
+            warning "Source version ($version) may not be fully compatible with QuickBuild 16 containers"
             warning "Migration may require manual adjustments"
+        elif [[ ! "$version" =~ ^16\. ]]; then
+            warning "Source version ($version) will be upgraded in place to QuickBuild 16 on first start (back up first)"
         fi
     else
         warning "Could not detect QuickBuild version"

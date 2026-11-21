@@ -1,4 +1,4 @@
-# QuickBuild 14 Microsoft SQL Server StatefulSet
+# QuickBuild 16 Microsoft SQL Server StatefulSet
 # Provides persistent database service for QuickBuild
 
 apiVersion: apps/v1

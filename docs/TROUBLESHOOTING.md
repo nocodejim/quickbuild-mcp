@@ -1,6 +1,6 @@
-# QuickBuild 14 Troubleshooting Guide
+# QuickBuild 16 Troubleshooting Guide
 
-Comprehensive troubleshooting guide for common issues, solutions, and diagnostic procedures for the QuickBuild 14 containerization solution.
+Comprehensive troubleshooting guide for common issues, solutions, and diagnostic procedures for the QuickBuild 16 containerization solution.
 
 ## Table of Contents
 
@@ -83,7 +83,7 @@ Comprehensive troubleshooting guide for common issues, solutions, and diagnostic
 4. **Verify Volume Permissions**
    ```bash
    # Check if volumes are accessible
-   docker volume inspect quickbuild14_db_data
+   docker volume inspect quickbuild_db_data
    ```
 
 ### Issue: Database Connection Refused
@@ -111,7 +111,7 @@ Comprehensive troubleshooting guide for common issues, solutions, and diagnostic
 3. **Verify Database Initialization**
    ```bash
    # Check if database and user were created
-   docker-compose exec qb-database /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -Q "SELECT name FROM sys.databases WHERE name='quickbuild'"
+   docker-compose exec qb-database /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$SA_PASSWORD" -Q "SELECT name FROM sys.databases WHERE name='quickbuild'"
    ```
 
 4. **Check Service Discovery**
@@ -215,7 +215,7 @@ Comprehensive troubleshooting guide for common issues, solutions, and diagnostic
 2. **Verify Database Schema**
    ```bash
    # Check if QuickBuild tables exist
-   docker-compose exec qb-database /opt/mssql-tools/bin/sqlcmd -S localhost -U qb_user -P "$QB_DB_PASSWORD" -d quickbuild -Q "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES"
+   docker-compose exec qb-database /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U qb_user -P "$QB_DB_PASSWORD" -d quickbuild -Q "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES"
    ```
 
 3. **Reset Configuration**
@@ -234,17 +234,19 @@ Comprehensive troubleshooting guide for common issues, solutions, and diagnostic
 **Solutions:**
 
 1. **Increase JVM Memory**
-   ```properties
-   # In wrapper.conf.template
-   wrapper.java.initmemory=2048
-   wrapper.java.maxmemory=6144
+   ```bash
+   # The server runs QuickBuild's bundled Java Service Wrapper (conf/wrapper.conf from the
+   # distribution). Override the max heap via the qb-server environment:
+   QB_JAVA_MAX_MEMORY_MB=6144
    ```
 
 2. **Optimize Garbage Collection**
    ```properties
-   # Add GC options
-   wrapper.java.additional.10=-XX:+UseG1GC
-   wrapper.java.additional.11=-XX:MaxGCPauseMillis=200
+   # Add GC options to conf/wrapper.conf on the qb-server-data volume (use unused indexes;
+   # 10-16 are taken by QuickBuild's own flags). Note: wrapper.conf is refreshed from the
+   # image on every start, so bake persistent JVM flags into a custom image instead.
+   wrapper.java.additional.200=-XX:+UseG1GC
+   wrapper.java.additional.201=-XX:MaxGCPauseMillis=200
    ```
 
 3. **Monitor Memory Usage**
@@ -283,7 +285,7 @@ Comprehensive troubleshooting guide for common issues, solutions, and diagnostic
 4. **Verify Network Configuration**
    ```bash
    # Check if agents are on the same network
-   docker network inspect quickbuild14_qb_net
+   docker network inspect quickbuild_qb_net
    ```
 
 5. **Check Agent Configuration**
@@ -370,7 +372,7 @@ Comprehensive troubleshooting guide for common issues, solutions, and diagnostic
    ```bash
    # Docker Compose
    docker network ls | grep qb-net
-   docker network inspect quickbuild14_qb_net
+   docker network inspect quickbuild_qb_net
 
    # Kubernetes
    kubectl get services -n quickbuild
@@ -545,7 +547,7 @@ Comprehensive troubleshooting guide for common issues, solutions, and diagnostic
    ```bash
    # Docker Compose
    docker volume ls | grep quickbuild
-   docker volume inspect quickbuild14_server_data
+   docker volume inspect quickbuild_server_data
 
    # Kubernetes
    kubectl get pvc -n quickbuild
@@ -584,7 +586,7 @@ Comprehensive troubleshooting guide for common issues, solutions, and diagnostic
 2. **Check Database Credentials**
    ```bash
    # Test database connection
-   docker-compose exec qb-database /opt/mssql-tools/bin/sqlcmd -S localhost -U qb_user -P "$QB_DB_PASSWORD" -Q "SELECT 1"
+   docker-compose exec qb-database /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U qb_user -P "$QB_DB_PASSWORD" -Q "SELECT 1"
    ```
 
 3. **Verify Secret Configuration**
@@ -774,7 +776,7 @@ curl -s http://localhost:8810/rest/builds/queue | jq length
 4. **Search for ERROR and WARN messages** - they highlight problems
 
 ### Community Resources
-- QuickBuild Documentation: https://wiki.pmease.com/display/QB14
+- QuickBuild Documentation: https://wiki.pmease.com/display/QB16
 - Docker Documentation: https://docs.docker.com/
 - Kubernetes Documentation: https://kubernetes.io/docs/
 
@@ -785,4 +787,4 @@ curl -s http://localhost:8810/rest/builds/queue | jq length
 4. Include environment details (OS, Docker version, etc.)
 5. Create detailed issue report with all collected information
 
-This troubleshooting guide covers the most common issues encountered with QuickBuild 14 containerization. For issues not covered here, use the diagnostic tools provided and follow the systematic approach outlined above.
+This troubleshooting guide covers the most common issues encountered with QuickBuild 16 containerization. For issues not covered here, use the diagnostic tools provided and follow the systematic approach outlined above.

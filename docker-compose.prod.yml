@@ -1,4 +1,4 @@
-# QuickBuild 14 Production Docker Compose Override
+# QuickBuild 16 Production Docker Compose Override
 # Extends docker-compose.yml with production-specific configurations
 # Includes secrets management, resource limits, and security enhancements
 
@@ -151,3 +151,9 @@ volumes:
       type: none
       o: bind
       device: ${QB_DATA_PATH:-/opt/quickbuild/data}/server-data
+  qb-server-storage:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${QB_DATA_PATH:-/opt/quickbuild/data}/server-storage

@@ -1,5 +1,5 @@
 #!/bin/bash
-# QuickBuild 14 Server Health Check Script
+# QuickBuild Server Health Check Script
 # Verifies server is running and responding to requests
 # Used by Docker health check mechanism
 

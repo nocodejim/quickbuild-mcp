@@ -1,4 +1,4 @@
-# QuickBuild 14 Ingress
+# QuickBuild 16 Ingress
 # External access configuration for QuickBuild server
 
 apiVersion: networking.k8s.io/v1
