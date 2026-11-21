@@ -18,8 +18,12 @@
 
 ## Step 1: Clean Environment
 ```bash
-# Stop any existing QuickBuild containers
-docker-compose down -v
+# Stop any existing QuickBuild containers (keeps database/server volumes)
+docker-compose down
+
+# Only if you want to start from an empty database: add -v.
+# WARNING: -v deletes this project's volumes (QuickBuild database, server data, storage).
+# docker-compose down -v
 
 # Remove only QuickBuild-related containers (if they exist)
 docker rm -f qb-server qb-database 2>/dev/null || true

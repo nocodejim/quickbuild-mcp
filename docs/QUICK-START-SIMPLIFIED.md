@@ -207,9 +207,12 @@ docker exec qb-database /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "
 # Test QuickBuild web interface
 curl -I http://localhost:8810
 
-# Clean restart (targets only this project's containers and volumes)
-docker compose down -v
+# Restart (keeps data)
+docker compose down
 docker compose up -d
+
+# Fresh start: WARNING -v deletes this project's volumes (QuickBuild database, server data, storage)
+# docker compose down -v && docker compose up -d
 ```
 
 This simplified approach should get you running much faster by avoiding the complex database initialization issues.
