@@ -4,7 +4,7 @@ from typing import Any, List
 
 from mcp.types import Resource, Tool
 
-from ..base import Feature
+from ..base import Feature, read_only_tool, write_tool
 from ...quickbuild_client import QuickBuildClient
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,7 @@ class SystemFeature(Feature):
             Tool(
                 name="system.backup_database",
                 description="Initiate a server-side QuickBuild database backup",
+                annotations=write_tool("Back up database", destructive=False, idempotent=False),
                 input_schema={
                     "type": "object",
                     "properties": {
@@ -36,6 +37,7 @@ class SystemFeature(Feature):
             Tool(
                 name="system.get_version",
                 description="Get QuickBuild server version information",
+                annotations=read_only_tool("QuickBuild version"),
                 input_schema={
                     "type": "object",
                     "properties": {},

@@ -86,3 +86,5 @@ logs/
 .DS_Store
 Thumbs.db
 *Zone.Identifier
+# End-to-end harness state (scripts/e2e.sh)
+.e2e/

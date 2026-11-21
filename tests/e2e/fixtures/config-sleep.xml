@@ -1,0 +1,45 @@
+<!--
+  e2e fixture: a long-running build, used to check builds.list_running, build_requests.list
+  and build_requests.cancel. Created by scripts/e2e.sh setup with
+  POST /rest/configurations (Content-Type: application/xml).
+
+  QuickBuild 16 stores only what a child configuration overrides (everything else is inherited
+  from root), but the empty collections and statusDate below must be present: QuickBuild
+  answers HTTP 500 when they are missing.
+-->
+<com.pmease.quickbuild.model.Configuration>
+  <disabled>false</disabled>
+  <parent>1</parent>
+  <name>e2e-sleep</name>
+  <description>e2e fixture: long-running build (running/queue/cancel checks)</description>
+  <order>100</order>
+  <statusDate>2026-01-01T00:00:00.000Z</statusDate>
+  <pluginSettingDOMs/>
+  <data/>
+  <stepDOMs>
+    <entry>
+      <string>master</string>
+      <com.pmease.quickbuild.plugin.basis.CommandBuildStep>
+        <name>master</name>
+        <inheritable>true</inheritable>
+        <enabled>true</enabled>
+        <executeCondition class="com.pmease.quickbuild.setting.step.executecondition.AllPreviousSiblingStepsSuccessful"/>
+        <nodeMatcher class="com.pmease.quickbuild.setting.step.nodematcher.ParentNodeMatcher"/>
+        <nodePreference class="com.pmease.quickbuild.setting.step.nodepreference.PreferLeastLoadedNode"/>
+        <timeout>0</timeout>
+        <showLinksInLog>false</showLinksInLog>
+        <preExecuteAction class="com.pmease.quickbuild.setting.step.executeaction.NoAction"/>
+        <postExecuteAction class="com.pmease.quickbuild.setting.step.executeaction.NoAction"/>
+        <repetitions/>
+        <command>sleep 600</command>
+        <environments/>
+        <waitForFinish>true</waitForFinish>
+      </com.pmease.quickbuild.plugin.basis.CommandBuildStep>
+    </entry>
+  </stepDOMs>
+  <repositoryDOMs/>
+  <aggregationDOMs/>
+  <variables/>
+  <notifications/>
+  <promotions/>
+</com.pmease.quickbuild.model.Configuration>

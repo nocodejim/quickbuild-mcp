@@ -17,15 +17,102 @@ Complete reference for all configuration options, environment variables, and cus
 
 ### MCP Server Configuration
 
+All MCP server settings are read and validated once at startup (`src/config.py`); an invalid
+value stops the server with a message naming the variable. Secrets are never logged.
+
+#### Connecting to QuickBuild
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `QB_URL` | `http://localhost:8810` | QuickBuild server URL (`http://qb-server:8810` inside the compose network) |
-| `QB_USER` | `admin` | QuickBuild account used by the MCP server |
-| `QB_PASSWORD` | *Required* | Password for `QB_USER` |
-| `QB_AUTH_MODE` | `basic` | `basic`: HTTP Basic credentials on every request (the QuickBuild REST API scheme). `session`: legacy login via `POST /rest/authentication` (only for proxies that provide it) |
+| `QB_URL` | `http://localhost:8810` | QuickBuild server URL (`http://qb-server:8810` inside the compose network, `https://...` for a corporate server) |
+| `QB_USER` | `admin` | QuickBuild account used by the MCP server (a dedicated service account is recommended) |
+| `QB_AUTH_MODE` | `basic` | `basic`: HTTP Basic `QB_USER:QB_PASSWORD` on every request (the QuickBuild REST API scheme). `token`: HTTP Basic `QB_USER:QB_TOKEN` with the user's QuickBuild access token. `session`: legacy login via `POST /rest/authentication` (only for proxies that provide it) |
+| `QB_PASSWORD` / `QB_PASSWORD_FILE` | *Required* unless `QB_AUTH_MODE=token` | Password for `QB_USER`. `QB_PASSWORD_FILE` (a mounted Docker/Kubernetes secret) wins over `QB_PASSWORD`; one trailing newline is stripped |
+| `QB_TOKEN` / `QB_TOKEN_FILE` | *Required* with `QB_AUTH_MODE=token` | QuickBuild access token of `QB_USER` (*My Setting > Access Token*, 40 characters). File form as above |
+| `QB_TIMEOUT` | `30` | Seconds to wait for QuickBuild per request (connect and read) |
+| `QB_VERIFY_SSL` | `true` | Verify QuickBuild's TLS certificate. `false` is for testing only and logs a warning |
+| `QB_CA_BUNDLE` | *unset* | PEM file (or directory) with the CA certificates that signed QuickBuild's certificate, e.g. the corporate root CA. Added to the public CA roots, not a replacement |
+| `HTTPS_PROXY` / `HTTP_PROXY` / `ALL_PROXY` / `NO_PROXY` | *unset* | Standard proxy variables (see below) |
 | `QB_BACKUP_DIR` | `/opt/quickbuild/data/backup` | Server-side directory for `system.backup_database` when no `backup_path` is given |
-| `QB_CACHE_TTL_CONFIGS` | `300` | Configuration list cache TTL in seconds (`0` disables) |
+| `QB_CACHE_TTL_CONFIGS` | `300` | Configuration list (and configuration path lookup) cache TTL in seconds (`0` disables) |
 | `QB_CACHE_TTL_AGENTS` | `30` | Agent list cache TTL in seconds (`0` disables) |
+
+#### Safety
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `QB_READ_ONLY` | `false` | `true` hides the write tools (`builds.trigger`, `build_requests.cancel`, `system.backup_database`) from `tools/list` **and** refuses them by name with an error, without contacting QuickBuild |
+
+Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`), so
+clients and gateways can apply their own policy too. A tool without a read-only annotation is
+treated as a write tool.
+
+#### MCP transport
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_TRANSPORT` | `stdio` | `stdio` (a client starts the server as a subprocess) or `http` (Streamable HTTP, for a gateway). The compose service uses `http` |
+| `MCP_HOST` | `127.0.0.1` | Address the HTTP server binds to. The container image sets `0.0.0.0`, which is required for a published port |
+| `MCP_PORT` | `14002` | HTTP port. In compose, `MCP_PORT` is the published host port; the container always listens on 14002 |
+| `MCP_HTTP_PATH` | `/mcp` | Path of the MCP endpoint |
+| `MCP_HTTP_STATELESS` | `true` | Stateless Streamable HTTP (no session affinity needed behind a gateway or with several replicas). `false` keeps MCP sessions in memory |
+| `MCP_ALLOWED_HOSTS` | *unset* | Comma-separated `Host` header values the HTTP server accepts (DNS-rebinding protection), e.g. `quickbuild-mcp.corp:*,localhost:*`; other hosts get HTTP 421. Unset: loopback binds are protected by the MCP SDK, other binds accept any host (a warning is logged) |
+| `MCP_ALLOWED_ORIGINS` | *unset* | Comma-separated `Origin` values accepted when a client sends one (browsers). Requires `MCP_ALLOWED_HOSTS` |
+| `LOG_LEVEL` | `INFO` | Python log level (logs go to stderr) |
+
+HTTP endpoints: `POST/GET /mcp` (MCP Streamable HTTP), `GET /health` (liveness; never contacts
+QuickBuild) and `GET /ready` (200 when QuickBuild answers `/rest/version` within 5 s, else 503).
+The container `HEALTHCHECK` runs `python -m src.healthcheck`, which probes `/health` in HTTP mode.
+
+> Inbound authentication of MCP clients (OAuth 2.1 resource-server mode) is planned for the
+> hardening phase (see TODO.md). Until then, expose port 14002 only to the gateway (cluster
+> network policy / firewall) and let the gateway authenticate users.
+
+#### Corporate deployment example
+
+A FastMCP gateway reaching the MCP server in Kubernetes, which reaches an HTTPS QuickBuild
+signed by the corporate CA through the egress proxy, read-only, with credentials from secrets:
+
+```env
+QB_URL=https://quickbuild.corp.example
+QB_USER=svc-quickbuild-mcp
+QB_AUTH_MODE=token
+QB_TOKEN_FILE=/var/run/secrets/quickbuild/token
+QB_CA_BUNDLE=/etc/ssl/corp/ca-bundle.pem
+HTTPS_PROXY=http://proxy.corp.example:3128
+NO_PROXY=quickbuild.corp.example,.svc.cluster.local
+QB_READ_ONLY=true
+QB_TIMEOUT=20
+MCP_TRANSPORT=http
+MCP_HOST=0.0.0.0
+MCP_ALLOWED_HOSTS=quickbuild-mcp.quickbuild.svc.cluster.local:*,quickbuild-mcp:*
+```
+
+#### Proxies
+
+The QuickBuild client honours `HTTPS_PROXY` (for `https://` URLs), `HTTP_PROXY` (for `http://`),
+`ALL_PROXY` and `NO_PROXY`, read when the server starts. HTTPS goes through the proxy as a
+`CONNECT` tunnel, so certificate verification (and `QB_CA_BUNDLE`) still applies end to end.
+`NO_PROXY` accepts `*`, host names, domain suffixes (`corp.example` matches `corp.example`
+and `qb.corp.example`; `.corp.example` only subdomains), exact IP addresses and `localhost`.
+**CIDR ranges such as `10.0.0.0/8` are not supported** (requests to those addresses still use
+the proxy, and the server logs a warning); list the QuickBuild host name or IP instead.
+
+#### QuickBuild 16 specifics the client relies on
+
+Verified against QuickBuild 16.0.37 by `scripts/e2e.sh`:
+
+- Access tokens are sent as the HTTP Basic password; a `Bearer` header is rejected (401).
+- Configuration arguments accept a numeric id or a path (`root/team/app`), resolved with
+  `GET /rest/ids?configuration_path=`.
+- Build logs come from `GET /download/{build id}/log` and only once a build has finished
+  (no live log, no `Range` support); `builds.get_log` keeps just the tail in memory.
+- Missing builds, configurations and requests come back as HTTP 500 with a "not found" body;
+  they are reported as not found, not retried.
+- `DELETE /rest/build_requests/{request id}` stops a running build (status `CANCELLED`);
+  QuickBuild removes the request from the queue a moment later.
+- Request ids and numeric ids are validated before they are placed in a URL path, and POST
+  requests are only retried when the connection was never established (no duplicate builds).
 
 ### Database Configuration
 

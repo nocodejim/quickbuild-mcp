@@ -224,6 +224,7 @@ services:
       context: .
       dockerfile: ./Dockerfile
     container_name: mcp-quickbuild-server
+    # stdin is only used with MCP_TRANSPORT=stdio (e.g. `docker compose run --rm -T mcp-quickbuild-server`)
     stdin_open: true
     tty: false
     environment:
@@ -231,8 +232,17 @@ services:
       - QB_USER=${QB_USER:-admin}
       - QB_PASSWORD=${QB_PASSWORD:-admin}
       - QB_AUTH_MODE=${QB_AUTH_MODE:-basic}
+      - QB_TOKEN=${QB_TOKEN:-}
+      - QB_READ_ONLY=${QB_READ_ONLY:-false}
+      - QB_VERIFY_SSL=${QB_VERIFY_SSL:-true}
+      - QB_TIMEOUT=${QB_TIMEOUT:-30}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - MCP_PORT=${MCP_PORT:-14002}
+      # Streamable HTTP for a gateway: http://<host>:${MCP_PORT}/mcp, /health, /ready
+      - MCP_TRANSPORT=${MCP_TRANSPORT:-http}
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=14002
+      - MCP_ALLOWED_HOSTS=${MCP_ALLOWED_HOSTS:-}
+      - MCP_ALLOWED_ORIGINS=${MCP_ALLOWED_ORIGINS:-}
       - QB_CACHE_TTL_CONFIGS=${QB_CACHE_TTL_CONFIGS:-300}
       - QB_CACHE_TTL_AGENTS=${QB_CACHE_TTL_AGENTS:-30}
     ports:
@@ -243,6 +253,12 @@ services:
       qb-server:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-m", "src.healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # MCP Server Unit Test Runner
   test:

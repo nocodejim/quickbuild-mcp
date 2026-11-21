@@ -16,6 +16,7 @@ from mcp.types import (
     Tool,
 )
 
+from src.features.build_requests.feature import BuildRequestsFeature
 from src.features.builds.feature import BuildsFeature
 from src.features.changes.feature import ChangesFeature
 from src.features.configurations.feature import ConfigurationsFeature
@@ -50,15 +51,17 @@ class TestQuickBuildMCPServer:
         assert server.resource_template_handlers == []
 
     def test_load_features(self, server):
-        """Test loading all 5 feature modules"""
+        """Test loading all 6 feature modules"""
         features = server.load_features()
 
-        assert len(features) == 5
-        assert isinstance(features[0], ConfigurationsFeature)
-        assert isinstance(features[1], BuildsFeature)
-        assert isinstance(features[2], GridFeature)
-        assert isinstance(features[3], ChangesFeature)
-        assert isinstance(features[4], SystemFeature)
+        assert [type(f) for f in features] == [
+            ConfigurationsFeature,
+            BuildsFeature,
+            BuildRequestsFeature,
+            GridFeature,
+            ChangesFeature,
+            SystemFeature,
+        ]
 
     @pytest.mark.asyncio
     async def test_setup_success(self, server):
@@ -174,14 +177,16 @@ class TestQuickBuildMCPServer:
     async def test_dispatch_tool_call_unknown_and_error(self, server):
         """Test tool dispatch for unknown tool and handler exception"""
         unknown = await server.dispatch_tool_call("missing.tool", {})
-        assert unknown[0].text == "Unknown tool: missing.tool"
+        assert unknown.is_error is True
+        assert json.loads(unknown.content[0].text) == {"error": "Unknown tool: missing.tool"}
 
         mock_feature = AsyncMock()
         mock_feature.handle_tool_call.side_effect = RuntimeError("Tool boom")
         server.tool_handlers = {"failing.tool": mock_feature}
 
         errored = await server.dispatch_tool_call("failing.tool", {})
-        assert errored[0].text == "Error: Tool boom"
+        assert errored.is_error is True
+        assert json.loads(errored.content[0].text) == {"error": "Tool boom"}
 
     @pytest.mark.asyncio
     async def test_dispatch_resource_request_unknown_and_error(self, server):

@@ -1,0 +1,7 @@
+# shellcheck configuration (CI runs: shellcheck -S warning on every *.sh)
+#
+# SC2155 (declare and assign separately) is disabled on purpose: the operational scripts run
+# with `set -e` and use `local var=$(probe)` where the probe (docker inspect, curl, kubectl, ...)
+# is expected to fail sometimes. Splitting the declaration would make those failures abort the
+# script, changing behaviour that the scripts rely on.
+disable=SC2155

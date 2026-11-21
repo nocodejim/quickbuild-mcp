@@ -1,0 +1,130 @@
+name: CI
+
+# Unit tests, config and script checks, and secret scanning run on every push and PR.
+# The live QuickBuild 16 + SQL Server end-to-end suite (scripts/e2e.sh, ~10-15 min, downloads
+# the QuickBuild distribution) runs only when started by hand: Actions > CI > Run workflow.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      e2e:
+        description: Run the live QuickBuild end-to-end suite (scripts/e2e.sh)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: pytest (coverage gate 90%)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: pytest
+        # pytest.ini adds --cov=src and deselects the e2e marker; pyproject.toml sets fail_under = 90
+        run: python -m pytest
+
+  compose:
+    name: docker compose config
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate base, dev, prod and scale configurations
+        run: |
+          set -euo pipefail
+          docker compose version
+          for override in "" docker-compose.dev.yml docker-compose.prod.yml docker-compose.scale.yml; do
+            args=(-f docker-compose.yml)
+            [ -n "$override" ] && args+=(-f "$override")
+            echo "docker compose ${args[*]} config -q"
+            docker compose "${args[@]}" config -q
+          done
+
+  shell:
+    name: bash -n + shellcheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: bash -n (each script)
+        run: |
+          status=0
+          while IFS= read -r -d '' script; do
+            if bash -n "$script"; then
+              echo "ok   $script"
+            else
+              echo "::error file=$script::bash -n failed"
+              status=1
+            fi
+          done < <(git ls-files -z '*.sh')
+          exit "$status"
+      - name: shellcheck (warnings and errors; settings in .shellcheckrc)
+        run: |
+          shellcheck --version
+          git ls-files -z '*.sh' | xargs -0 shellcheck -S warning
+
+  gitleaks:
+    name: gitleaks (full history)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # scan every commit; .gitleaksignore fingerprints reference history
+          persist-credentials: false
+      - name: Scan for secrets
+        # Accepted findings (test-harness placeholders) are listed in .gitleaksignore
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 \
+            git /repo --no-banner --redact --verbose
+
+  e2e:
+    name: e2e (live QuickBuild 16 harness)
+    if: github.event_name == 'workflow_dispatch' && inputs.e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: scripts/e2e.sh (up, setup, test, down)
+        env:
+          E2E_LOG_DIR: ${{ runner.temp }}/e2e-logs
+        run: scripts/e2e.sh
+      - name: Upload container logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-logs
+          path: ${{ runner.temp }}/e2e-logs
+          if-no-files-found: ignore

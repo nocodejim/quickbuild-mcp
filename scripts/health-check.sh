@@ -6,9 +6,9 @@
 set -e
 
 # Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TIMEOUT=30
 OUTPUT_FORMAT="text"
+# shellcheck disable=SC2034  # --continue is accepted but not acted on yet (see TODO.md)
 EXIT_ON_FAILURE=true
 
 # Colors for output
@@ -108,6 +108,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -c|--continue)
+            # shellcheck disable=SC2034
             EXIT_ON_FAILURE=false
             shift
             ;;

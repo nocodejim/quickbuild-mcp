@@ -56,8 +56,12 @@ usage() {
 # Parse command line arguments
 SOURCE_PATH=""
 DATABASE_BACKUP=""
+# -e/-n/-p are accepted but not acted on yet (see TODO.md)
+# shellcheck disable=SC2034
 ENVIRONMENT=""
+# shellcheck disable=SC2034
 NAMESPACE="quickbuild"
+# shellcheck disable=SC2034
 COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME:-quickbuild14}"
 DRY_RUN=false
 MIGRATION_DIR="$PROJECT_ROOT/migration_$(date +%Y%m%d_%H%M%S)"
@@ -73,14 +77,17 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -e|--environment)
+            # shellcheck disable=SC2034
             ENVIRONMENT="$2"
             shift 2
             ;;
         -n|--namespace)
+            # shellcheck disable=SC2034
             NAMESPACE="$2"
             shift 2
             ;;
         -p|--project)
+            # shellcheck disable=SC2034
             COMPOSE_PROJECT="$2"
             shift 2
             ;;

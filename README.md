@@ -13,51 +13,90 @@ A unified repository combining:
 ### Features
 
 #### MCP Tools
-- `builds.trigger` — Trigger a new build for a configuration ID with optional build variables.
-- `builds.get_latest_status` — Retrieve the status, version, timestamps, and success flag of the latest build for a configuration.
-- `grid.list_agents` — List all build agents and their online/offline status.
-- `system.backup_database` — Initiate a server-side QuickBuild database backup (with optional `backup_path`).
-- `system.get_version` — Retrieve QuickBuild server version metadata.
+
+Read tools (always available):
+
+- `configurations.search` — Find configurations by id, name, path (`root/team/app`) or description; best matches first.
+- `builds.get_latest_status` — Status, version, timestamps and success flag of a configuration's latest build.
+- `builds.get` — One build: status, timing, node, each step's status and duration, checked-out revisions, request variables (secret values stay masked).
+- `builds.get_log` — The last lines of a finished build's log (`tail_lines`, default 200, max 2000).
+- `builds.list_running` — Builds that are running now (optionally under one configuration).
+- `build_requests.list` — The build queue: waiting and running build requests.
+- `grid.list_agents` — Build agents and their online/offline status.
+- `grid.list_unauthorized` — Agents waiting to be authorized on the Grid page.
+- `system.get_version` — QuickBuild server version.
+
+Write tools (hidden and refused when `QB_READ_ONLY=true`):
+
+- `builds.trigger` — Request a build of a configuration, with optional variables; returns the `request_id`.
+- `build_requests.cancel` — Cancel a queued or running build request (a running build ends `CANCELLED`).
+- `system.backup_database` — Start a server-side QuickBuild database backup (optional `backup_path`).
+
+Configuration arguments accept a numeric id or a path such as `root/team/app`. Every tool carries
+MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`), and failures are returned
+with `isError: true`.
 
 #### MCP Resources & Resource Templates
-- `configurations://list` — List all build configurations and parent hierarchy.
-- `changes://build/{build_id}` — Retrieve SCM changes for a specific build ID (registered as both a resource and a parameterized resource template).
+- `configurations://list` — All build configurations with their path and parent.
+- `changes://build/{build_id}` — SCM changesets of a build: revision, author, message, repository and per-file actions (registered as both a resource and a resource template).
 
-### Running the MCP Server Locally
+### Running the MCP Server
 
 ```bash
-# Install dependencies (Python 3.11+ / 3.12 recommended)
-pip install -r requirements.txt
-# Or with uv:
+# stdio (an MCP client starts the server as a subprocess)
 uv run --no-project --with-requirements requirements.txt python -m src.server
+
+# Streamable HTTP for a gateway: http://127.0.0.1:14002/mcp, plus /health and /ready
+MCP_TRANSPORT=http uv run --no-project --with-requirements requirements.txt python -m src.server
+
+# Container (compose runs it in HTTP mode on port 14002)
+docker compose up -d mcp-quickbuild-server
 ```
 
-Configure `.env` (copied from `.env.example`):
+Configure `.env` (copied from `.env.example`) or the environment:
 
 ```env
 QB_URL=http://localhost:8810
 QB_USER=admin
-QB_PASSWORD=your_qb_password
-QB_AUTH_MODE=basic   # HTTP Basic on every request (QuickBuild REST API); "session" = legacy /rest/authentication login
+QB_PASSWORD=your_qb_password      # or QB_PASSWORD_FILE=/run/secrets/qb_password
+QB_AUTH_MODE=basic                # basic | token (QB_TOKEN / QB_TOKEN_FILE) | session
+QB_READ_ONLY=false                # true: no trigger / cancel / backup
 LOG_LEVEL=INFO
-QB_CACHE_TTL_CONFIGS=300
-QB_CACHE_TTL_AGENTS=30
 ```
 
-The client talks to the QuickBuild REST API (JSON edition, `Accept: application/json`) and was verified
-live against QuickBuild 16.0.37: `configurations?recursive=true`, `latest_builds/{id}`, `build_requests`,
-`buildagents/active|inactive`, `changes/commits/build/{id}`, `version`, and `backup`. QuickBuild 16 requires
-authentication even for `/rest/version`.
+For a corporate QuickBuild: `QB_CA_BUNDLE` (corporate CA), `QB_VERIFY_SSL`, `QB_TIMEOUT`,
+`HTTPS_PROXY`/`NO_PROXY`, access-token auth, read-only mode, and the HTTP transport settings
+(`MCP_HOST`, `MCP_ALLOWED_HOSTS`, ...) are described in
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md#mcp-server-configuration), with a complete example.
+Inbound authentication of MCP clients is planned for the hardening phase; until then expose the
+HTTP port only to the gateway.
 
-### Running Unit Tests
+The client talks to the QuickBuild REST API (JSON edition, `Accept: application/json`). Every
+endpoint and JSON shape it uses was verified live against QuickBuild 16.0.37 by the e2e suite.
+
+### Tests
 
 ```bash
-# Local test run with coverage
+# Unit and contract tests with the 90% coverage gate (the e2e tests are excluded by default)
 uv run --no-project --with-requirements requirements.txt pytest
 
-# Or via Docker test container
+# End-to-end: build and start an isolated QuickBuild 16 + SQL Server 2025 stack, run the setup
+# wizard, authorize an agent, create fixture configurations (incl. a Git repository), run every
+# MCP tool and resource over stdio, check the HTTP container (catalog, calls, /health, /ready,
+# Host allow-list) and TLS/proxy/token/read-only behaviour, then tear down
+scripts/e2e.sh                 # or: up | setup | test | down | status, --keep to debug
+
+# Or via the Docker test container
 python run_tests.py
 ```
+
+`scripts/e2e.sh` uses compose project `qbe2e`, subnet `10.221.0.0/16` and loopback-only ports
+(18810, 14012, 18843); it generates its own passwords and removes only what it created.
+
+CI (`.github/workflows/ci.yml`) runs pytest with the coverage gate, `docker compose config -q`
+for the base/dev/prod/scale files, `bash -n` and `shellcheck` on every script, and gitleaks on
+the full history on each push and pull request; the e2e suite runs on demand
+(*Actions > CI > Run workflow*).
 
 ---
 
@@ -140,16 +179,20 @@ docker compose build qb-agent-base && docker compose build
 ```text
 quickbuild-mcp/
 ├── src/                        # QuickBuild MCP Server (Python + MCP SDK v2)
-│   ├── features/               # builds, changes, configurations, grid, system
-│   ├── models/                 # Agent, Build, Change, Configuration dataclasses
+│   ├── features/               # builds, build_requests, changes, configurations, grid, system
+│   ├── models/                 # Agent, Build, BuildRequest, Change, Configuration dataclasses
+│   ├── config.py               # Environment settings (auth, TLS, proxy, read-only, transport)
 │   ├── quickbuild_client.py    # Async httpx client with retry & TTL cache
-│   └── server.py               # MCP Server core & request dispatch
-├── tests/                      # Pytest unit test suite
+│   ├── healthcheck.py          # Container health check (HTTP transport)
+│   └── server.py               # MCP Server core, read-only policy, stdio/HTTP transports
+├── tests/                      # Pytest unit and contract tests
+│   └── e2e/                    # Live harness suite (pytest -m e2e), wizard, fixtures, compose override
+├── .github/workflows/ci.yml    # CI: pytest, compose config, bash -n/shellcheck, gitleaks, e2e
 ├── qb-database/                # MSSQL 2025 Dockerfile, entrypoint, healthcheck, SQL init
 ├── qb-server/                  # QuickBuild 16 Dockerfile, entrypoint, dist fetcher, hibernate template
 ├── qb-agent/                   # Base, Maven, Node.js, and .NET agent images
 ├── kubernetes/                 # K8s manifests (Namespace, RBAC, StatefulSets, PVCs, Ingress)
-├── scripts/                    # Operational scripts (backup, restore, scale, monitor, validate)
+├── scripts/                    # Operational scripts (backup, restore, scale, monitor, validate, e2e)
 ├── docs/                       # Deployment, configuration, and troubleshooting guides
 ├── docker-compose*.yml         # Compose base and environment overrides
 ├── Dockerfile                  # MCP server production image (Python 3.12, non-root)

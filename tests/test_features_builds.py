@@ -24,7 +24,14 @@ class TestBuildsFeature:
         """Test getting tools from builds feature"""
         tools = feature.get_tools()
         
-        assert len(tools) == 2
+        assert [t.name for t in tools] == [
+            "builds.get_latest_status",
+            "builds.get",
+            "builds.get_log",
+            "builds.list_running",
+            "builds.trigger",
+        ]
+        assert [t.annotations.read_only_hint for t in tools] == [True, True, True, True, False]
         
         # Check builds.get_latest_status tool
         status_tool = next(t for t in tools if t.name == "builds.get_latest_status")

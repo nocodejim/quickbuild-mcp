@@ -23,7 +23,9 @@ class TestConfigurationsFeature:
         """Test getting tools from configurations feature"""
         tools = feature.get_tools()
         
-        assert tools == []  # No tools in MVP
+        assert [t.name for t in tools] == ["configurations.search"]
+        assert tools[0].input_schema["required"] == ["query"]
+        assert tools[0].annotations.read_only_hint is True
     
     def test_get_resources(self, feature):
         """Test getting resources from configurations feature"""
@@ -36,9 +38,9 @@ class TestConfigurationsFeature:
         assert resources[0].mime_type == "application/json"
     
     @pytest.mark.asyncio
-    async def test_handle_tool_call_not_implemented(self, feature):
-        """Test that tool calls are not implemented"""
-        with pytest.raises(NotImplementedError):
+    async def test_handle_tool_call_unknown(self, feature):
+        """Unknown tool names are rejected"""
+        with pytest.raises(ValueError, match="Unknown tool"):
             await feature.handle_tool_call("test_tool", {})
     
     @pytest.mark.asyncio

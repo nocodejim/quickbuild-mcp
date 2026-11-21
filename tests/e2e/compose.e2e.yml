@@ -1,0 +1,55 @@
+# End-to-end harness override, used by scripts/e2e.sh on top of docker-compose.yml.
+#
+# Lets the e2e stack run next to any other copy of the QuickBuild stack on the same host:
+# no fixed container or bridge names, published ports bound to loopback only, and no restart
+# policy (a crashed service should fail the run, not loop). Requires Docker Compose 2.24+
+# (!reset / !override tags). E2E_STATE_DIR (per-run certificates) comes from the env file
+# scripts/e2e.sh writes.
+services:
+  qb-database:
+    container_name: !reset null
+    restart: "no"
+    ports: !reset []
+
+  qb-server:
+    container_name: !reset null
+    restart: "no"
+    ports: !override
+      - "127.0.0.1:${E2E_QB_PORT:-18810}:8810"
+    healthcheck:
+      interval: 10s
+      start_period: 180s
+
+  qb-agent-base:
+    restart: "no"
+
+  # MCP server in Streamable HTTP mode, as a gateway would reach it
+  mcp-quickbuild-server:
+    container_name: !reset null
+    restart: "no"
+    environment:
+      - MCP_TRANSPORT=http
+      - MCP_ALLOWED_HOSTS=127.0.0.1:*,localhost:*
+      - QB_CACHE_TTL_CONFIGS=0
+      - QB_CACHE_TTL_AGENTS=0
+    ports: !override
+      - "127.0.0.1:${E2E_MCP_PORT:-14012}:14002"
+
+  # HTTPS front for QuickBuild with a certificate from the run's throwaway CA
+  qb-tls:
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    restart: "no"
+    depends_on:
+      qb-server:
+        condition: service_healthy
+    networks:
+      - qb-net
+    ports:
+      - "127.0.0.1:${E2E_TLS_PORT:-18843}:8443"
+    volumes:
+      - ${E2E_STATE_DIR:-./.e2e/unset}/tls:/etc/nginx/certs:ro
+      - ./tests/e2e/fixtures/nginx-tls.conf:/etc/nginx/conf.d/default.conf:ro
+
+networks:
+  qb-net:
+    driver_opts: !reset {}

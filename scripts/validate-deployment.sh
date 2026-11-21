@@ -11,7 +11,6 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME:-quickbuild14}"
 NAMESPACE="quickbuild"
 TIMEOUT=30
-MAX_RETRIES=5
 
 # Colors for output
 RED='\033[0;31m'
@@ -160,6 +159,7 @@ wait_for_service() {
         sleep 2
         elapsed=$((elapsed + 2))
     done
+    echo "Timed out after ${max_wait}s waiting for ${service_name} (${host}:${port})" >&2
     return 1
 }
 

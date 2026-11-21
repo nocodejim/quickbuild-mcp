@@ -67,7 +67,9 @@ class ChangesFeature(Feature):
                     "author": change.author,
                     "message": change.message,
                     "timestamp": change.timestamp.isoformat(),
+                    "repository": change.repository,
                     "files": change.files,
+                    "modifications": change.modifications,
                 }
                 for change in changes
             ]

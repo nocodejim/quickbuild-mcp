@@ -23,8 +23,9 @@ class TestGridFeature:
         """Test getting tools from grid feature"""
         tools = feature.get_tools()
         
-        assert len(tools) == 1
-        
+        assert [t.name for t in tools] == ["grid.list_agents", "grid.list_unauthorized"]
+        assert all(t.annotations.read_only_hint for t in tools)
+
         # Check grid.list_agents tool
         list_tool = tools[0]
         assert isinstance(list_tool, Tool)

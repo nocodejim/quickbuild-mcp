@@ -1,0 +1,7 @@
+# gitleaks findings reviewed and accepted (CI: gitleaks git scan over the full history).
+#
+# kubernetes/secrets.yaml holds base64 *placeholder* values for the local QuickBuild test
+# harness (see the file's header); real credentials are injected from GitHub / Kubernetes
+# secrets / the FastMCP gateway and never live in this repository.
+a120221ae877436049544c022aca3273a5b945d5:kubernetes/secrets.yaml:generic-api-key:20
+a120221ae877436049544c022aca3273a5b945d5:kubernetes/secrets.yaml:generic-api-key:21

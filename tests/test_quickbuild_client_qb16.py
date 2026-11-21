@@ -111,7 +111,7 @@ class TestAuthModes:
         assert client.client.auth is None
 
     def test_invalid_auth_mode_raises(self):
-        with patch.dict(os.environ, {**BASE_ENV, "QB_AUTH_MODE": "token"}, clear=True):
+        with patch.dict(os.environ, {**BASE_ENV, "QB_AUTH_MODE": "kerberos"}, clear=True):
             with pytest.raises(ValueError, match="QB_AUTH_MODE"):
                 QuickBuildClient()
 
@@ -203,9 +203,13 @@ class TestEndpoints:
 
     @pytest.mark.asyncio
     async def test_trigger_build_aggregated_request(self):
-        client, recorder = make_client({"POST /rest/build_requests": httpx.Response(204)})
+        client, recorder = make_client({
+            "GET /rest/ids": json_response(7),
+            "POST /rest/build_requests": httpx.Response(204),
+        })
         result = await client.trigger_build("root/app")
-        assert json.loads(recorder.requests[0].content)["configurationId"] == "root/app"
+        assert recorder.requests[0].url.params["configuration_path"] == "root/app"
+        assert json.loads(recorder.requests[1].content)["configurationId"] == 7
         assert result["status"] == "AGGREGATED"
         assert "variables" not in result
 

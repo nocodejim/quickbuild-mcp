@@ -7,7 +7,6 @@ set -e
 
 # Configuration
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.scale.yml"
-PROJECT_NAME="${COMPOSE_PROJECT_NAME:-quickbuild14}"
 
 run_compose() {
     if docker compose version >/dev/null 2>&1; then
@@ -163,6 +162,7 @@ show_status() {
     # Show resource usage if available
     if command -v docker > /dev/null 2>&1; then
         echo "Resource Usage:"
+        # shellcheck disable=SC2046  # one argument per container id
         docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" \
             $(run_compose $COMPOSE_FILES ps -q) 2>/dev/null | grep qb-agent || true
     fi

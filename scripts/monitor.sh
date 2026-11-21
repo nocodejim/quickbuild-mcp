@@ -24,7 +24,10 @@ NC='\033[0m'
 # Monitoring state
 MONITORING=true
 ALERT_THRESHOLD_CPU=80
+# Memory/disk thresholds are accepted but not checked yet (see TODO.md)
+# shellcheck disable=SC2034
 ALERT_THRESHOLD_MEMORY=85
+# shellcheck disable=SC2034
 ALERT_THRESHOLD_DISK=90
 
 # Logging functions
@@ -123,10 +126,12 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --memory-threshold)
+            # shellcheck disable=SC2034
             ALERT_THRESHOLD_MEMORY="$2"
             shift 2
             ;;
         --disk-threshold)
+            # shellcheck disable=SC2034
             ALERT_THRESHOLD_DISK="$2"
             shift 2
             ;;

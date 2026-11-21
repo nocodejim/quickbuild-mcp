@@ -1,0 +1,108 @@
+<!--
+  e2e fixture: checks out a local Git repository and prints 60 numbered log lines. Used to
+  verify changes://build/{id} against real SCM commits and builds.get_log tailing.
+  Created by scripts/e2e.sh setup with POST /rest/configurations (application/xml); the bare
+  repository lives in the server's data volume (file:// URL, so no Git server is needed).
+
+  XStream does not run constructors, so the GitRepository/RetrySetting defaults that the web
+  UI would fill in (user schema, retry patterns, depth, gc period, user mapping) are spelled
+  out here.
+-->
+<com.pmease.quickbuild.model.Configuration>
+  <disabled>false</disabled>
+  <parent>1</parent>
+  <name>e2e-git</name>
+  <description>e2e fixture: git checkout + numbered log lines (changes/log checks)</description>
+  <order>100</order>
+  <statusDate>2026-01-01T00:00:00.000Z</statusDate>
+  <pluginSettingDOMs/>
+  <data/>
+  <stepDOMs>
+    <entry>
+      <string>master</string>
+      <com.pmease.quickbuild.stepsupport.SequentialStep>
+        <name>master</name>
+        <inheritable>true</inheritable>
+        <enabled>true</enabled>
+        <executeCondition class="com.pmease.quickbuild.setting.step.executecondition.AllPreviousSiblingStepsSuccessful"/>
+        <nodeMatcher class="com.pmease.quickbuild.setting.step.nodematcher.ParentNodeMatcher"/>
+        <nodePreference class="com.pmease.quickbuild.setting.step.nodepreference.PreferLeastLoadedNode"/>
+        <timeout>0</timeout>
+        <showLinksInLog>false</showLinksInLog>
+        <preExecuteAction class="com.pmease.quickbuild.setting.step.executeaction.NoAction"/>
+        <postExecuteAction class="com.pmease.quickbuild.setting.step.executeaction.NoAction"/>
+        <repetitions/>
+        <childStepNames>
+          <string>checkout</string>
+          <string>print-lines</string>
+        </childStepNames>
+        <successCondition class="com.pmease.quickbuild.setting.step.successcondition.AllChildStepsSuccessful"/>
+        <environments/>
+      </com.pmease.quickbuild.stepsupport.SequentialStep>
+    </entry>
+    <entry>
+      <string>checkout</string>
+      <com.pmease.quickbuild.repositorysupport.CheckoutStep>
+        <name>checkout</name>
+        <inheritable>true</inheritable>
+        <enabled>true</enabled>
+        <executeCondition class="com.pmease.quickbuild.setting.step.executecondition.AllPreviousSiblingStepsSuccessful"/>
+        <nodeMatcher class="com.pmease.quickbuild.setting.step.nodematcher.ParentNodeMatcher"/>
+        <nodePreference class="com.pmease.quickbuild.setting.step.nodepreference.PreferLeastLoadedNode"/>
+        <timeout>0</timeout>
+        <showLinksInLog>false</showLinksInLog>
+        <preExecuteAction class="com.pmease.quickbuild.setting.step.executeaction.NoAction"/>
+        <postExecuteAction class="com.pmease.quickbuild.setting.step.executeaction.NoAction"/>
+        <repetitions/>
+        <repositoryName>e2e-git</repositoryName>
+      </com.pmease.quickbuild.repositorysupport.CheckoutStep>
+    </entry>
+    <entry>
+      <string>print-lines</string>
+      <com.pmease.quickbuild.plugin.basis.CommandBuildStep>
+        <name>print-lines</name>
+        <inheritable>true</inheritable>
+        <enabled>true</enabled>
+        <executeCondition class="com.pmease.quickbuild.setting.step.executecondition.AllPreviousSiblingStepsSuccessful"/>
+        <nodeMatcher class="com.pmease.quickbuild.setting.step.nodematcher.ParentNodeMatcher"/>
+        <nodePreference class="com.pmease.quickbuild.setting.step.nodepreference.PreferLeastLoadedNode"/>
+        <timeout>0</timeout>
+        <showLinksInLog>false</showLinksInLog>
+        <preExecuteAction class="com.pmease.quickbuild.setting.step.executeaction.NoAction"/>
+        <postExecuteAction class="com.pmease.quickbuild.setting.step.executeaction.NoAction"/>
+        <repetitions/>
+        <command>seq -f E2E-LOG-LINE-%03g 1 60</command>
+        <environments/>
+        <waitForFinish>true</waitForFinish>
+      </com.pmease.quickbuild.plugin.basis.CommandBuildStep>
+    </entry>
+  </stepDOMs>
+  <repositoryDOMs>
+    <entry>
+      <string>e2e-git</string>
+      <com.pmease.quickbuild.plugin.scm.git.GitRepository>
+        <name>e2e-git</name>
+        <inheritable>true</inheritable>
+        <quietPeriod>0</quietPeriod>
+        <userMapping class="com.pmease.quickbuild.setting.repository.usermapping.SameNameMapping"/>
+        <changesRecorded>false</changesRecorded>
+        <dirty>false</dirty>
+        <fetchUrl>file:///opt/quickbuild/data/e2e/repo.git</fetchUrl>
+        <branch>main</branch>
+        <userSchema>Author Name</userSchema>
+        <enableSubmodule>false</enableSubmodule>
+        <retrySetting>
+          <retryOnPatterns>fatal:.*Please try again</retryOnPatterns>
+          <retryTimes>3</retryTimes>
+        </retrySetting>
+        <depth>0</depth>
+        <gcPeriod>0</gcPeriod>
+        <environments/>
+      </com.pmease.quickbuild.plugin.scm.git.GitRepository>
+    </entry>
+  </repositoryDOMs>
+  <aggregationDOMs/>
+  <variables/>
+  <notifications/>
+  <promotions/>
+</com.pmease.quickbuild.model.Configuration>

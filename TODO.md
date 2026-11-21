@@ -77,20 +77,96 @@ and online, and every MCP tool/resource over the stdio wire protocol against the
 - [x] Client remapped to the QuickBuild 16 endpoints and JSON shapes above (models and MCP tool output shapes unchanged; `builds.trigger` adds `request_id`). New contract tests in `tests/test_quickbuild_client_qb16.py` replay payloads captured from the live server.
 
 ### Follow-ups found during Phase 2
-- [ ] Default `QB_NETWORK_SUBNET=172.20.0.0/16` collides with existing Docker networks on some hosts; hard-coded `container_name`s and the `qb-bridge` bridge name prevent running two stacks side by side.
+- [ ] Default `QB_NETWORK_SUBNET=172.20.0.0/16` collides with existing Docker networks on some hosts; hard-coded `container_name`s and the `qb-bridge` bridge name prevent running two stacks side by side. (The e2e harness works around this with `tests/e2e/compose.e2e.yml`; the base file is unchanged.)
 - [ ] `qb-node-global` volume / `/opt/qb-agent/.npm-global` PATH entry are now unused (npm `prefix` removed for NVM compatibility).
-- [ ] Changeset JSON mapping (`changes/commits/build/{id}`) follows the documented structure; verify against a build with real SCM changes.
+- [x] Changeset JSON mapping (`changes/commits/build/{id}`) verified in Phase 3 against a real Git commit (e2e fixture `root/e2e-git`); `RawChangeset` adds `previousEdition`, and the MCP output now includes the repository and per-file actions.
 - [ ] `kubernetes/configmap.yaml` `JAVA_OPTS` is not consumed by the server image (use `QB_JAVA_MAX_MEMORY_MB` or extend the entrypoint).
 - [ ] Persistent custom JVM flags: `conf/wrapper.conf` is refreshed from the image on start; consider an env hook for extra `wrapper.java.additional.N` flags.
-- [ ] Optional: QuickBuild access-token REST authentication (QB 12+) as a third `QB_AUTH_MODE`.
+- [x] QuickBuild access-token REST authentication: `QB_AUTH_MODE=token` (Phase 3; QuickBuild 16 takes the token as the HTTP Basic password).
 
 ---
 
-## Phase 3: Further Optimizations & Production Readiness
+## Phase 3: MCP Readiness (Done on `improve/phase3-mcp-readiness`)
 
-- [ ] **MCP HTTP/Streamable Transport:** Add optional Streamable HTTP transport (`server.streamable_http_app()` / `uvicorn`) behind an env flag (e.g. `MCP_TRANSPORT=stdio|http`) so `mcp-quickbuild-server` can serve remote clients on port `14002` in addition to `stdio`.
-- [ ] **Additional MCP Tools & Resources:** Implement remaining design/oracle items (`configurations.create`, build cancellation, build log streaming/tailing, JUnit test report resource, agent authorization).
-- [ ] **Auth & Config Hardening:** Basic auth is done (Phase 2); add QuickBuild access-token auth and explicit TLS verification options (`QB_VERIFY_SSL`).
-- [ ] **Kubernetes Hardening:** Update `kubernetes/` manifests (busybox bumped to 1.37.0 in Phase 2; replace placeholder secrets/images, add `mcp-quickbuild-server` Deployment/Service if desired, check `ReadWriteMany` PVC requirements).
-- [ ] **CI/CD Automation:** Add `.github/workflows/ci.yml` running `pytest`, `ruff`/`mypy`, `docker compose config`, `bash -n` / `shellcheck`, and Trivy image scanning on PRs.
-- [ ] **Live End-to-End Test Suite:** Add an integration test suite verifying MSSQL init -> QuickBuild server startup -> agent registration -> MCP tool & resource calls against the live stack.
+Every new endpoint and JSON shape below was confirmed against a live QuickBuild 16.0.37 (the e2e
+harness) before it was coded; payloads captured there back the contract tests
+(`tests/test_quickbuild_client_phase3.py`).
+
+### Test harness in the repo
+- [x] `scripts/e2e.sh [all|up|setup|test|down|status] [--keep] [--rmi]`: isolated compose project `qbe2e`
+  (subnet `10.221.0.0/16`, loopback-only ports 18810/14012/18843, per-run generated passwords),
+  first-run wizard (`tests/e2e/qb_setup.py`), agent authorization, fixtures, `pytest -m e2e`, and a
+  teardown that removes only the project's containers, network, labelled volumes and state dir.
+  `up` refuses to start unless every volume name carries the e2e project prefix (the base compose
+  file names volumes `${COMPOSE_PROJECT_NAME:-quickbuild}_*`).
+- [x] Fixtures created over REST (`tests/e2e/qb_fixtures.py`, `tests/e2e/fixtures/*.xml`): `root/e2e-sleep`
+  (long build for queue/cancel) and `root/e2e-git` (local bare Git repo + checkout + 60 log lines),
+  a baseline build, a commit by a second author, and a build that records it. `git` added to the
+  harness `qb-server` image. HTTPS front (`nginxinc/nginx-unprivileged:1.27-alpine`) with a
+  throwaway CA; MCP container in HTTP mode.
+- [x] `pytest` marker `e2e` (excluded by default via `pytest.ini`); 18 e2e tests over real MCP
+  sessions (stdio subprocess and the HTTP container).
+
+### Corporate readiness
+- [x] `src/config.py`: one validated settings object; `QB_PASSWORD_FILE`, `QB_TOKEN`/`QB_TOKEN_FILE`,
+  `QB_TIMEOUT`, `QB_VERIFY_SSL`, `QB_CA_BUNDLE` (added to certifi's roots), proxy variables via httpx
+  `trust_env` (CIDR entries in `NO_PROXY` are not supported by httpx and are warned about).
+- [x] `QB_READ_ONLY=true` hides and refuses `builds.trigger`, `build_requests.cancel`,
+  `system.backup_database`; all tools carry MCP annotations; tool failures return `isError: true`.
+- [x] `QB_AUTH_MODE=token`: QuickBuild 16 access tokens are the HTTP Basic password (`Bearer` is
+  rejected with 401; verified live).
+- [x] Untrusted certificates are reported as `TLS_VERIFY_FAILED` naming `QB_CA_BUNDLE` and are not retried.
+- [x] Ids are validated before they are placed in URL paths (httpx resolves `..` segments, so an
+  unchecked `request_id` could have redirected a DELETE); POSTs are retried only when the connection
+  was never established (a timeout after sending could already have queued a build).
+
+### Streamable HTTP transport
+- [x] `MCP_TRANSPORT=stdio|http` on `MCP_HOST:MCP_PORT` (14002) at `MCP_HTTP_PATH` (`/mcp`), stateless by
+  default; `GET /health` (liveness) and `GET /ready` (QuickBuild reachable); `MCP_ALLOWED_HOSTS` /
+  `MCP_ALLOWED_ORIGINS` for DNS-rebinding protection. Dockerfile `HEALTHCHECK` (`python -m src.healthcheck`);
+  the compose service runs HTTP with a healthcheck.
+
+### New tools (verified live)
+- [x] `builds.get` (`GET /rest/builds/{id}`: steps, revisions, masked request variables)
+- [x] `builds.get_log` (`GET /download/{id}/log`, tail kept in memory; finished builds only)
+- [x] `builds.list_running` (`GET /rest/builds?status=RUNNING&count=N[&configuration_id=]`; `count` is mandatory)
+- [x] `build_requests.list` (`GET /rest/build_requests[?configuration_id=]`)
+- [x] `build_requests.cancel` (`DELETE /rest/build_requests/{id}` -> 204; running build ends `CANCELLED`)
+- [x] `configurations.search` (client-side over the cached configuration list, ranked)
+- [x] `grid.list_unauthorized` (`GET /rest/buildagents/unauthorized`)
+- [x] Configuration arguments accept ids or paths (`GET /rest/ids?configuration_path=`)
+
+### CI
+- [x] `.github/workflows/ci.yml`: pytest with the 90% gate (`fail_under = 90`), `docker compose config -q`
+  for base/dev/prod/scale, per-file `bash -n` + `shellcheck -S warning`, gitleaks on the full history
+  (`.gitleaksignore` lists the two `kubernetes/secrets.yaml` placeholders), and `scripts/e2e.sh` as a
+  `workflow_dispatch` job (container logs uploaded on failure). Actions pinned to commit SHAs.
+- [x] Shell warnings fixed (unused variables, quoting); `SC2155` is disabled in `.shellcheckrc` because the
+  scripts run with `set -e` and rely on `local var=$(probe)` tolerating failed probes.
+
+### Follow-ups found during Phase 3
+- [ ] Parsed-but-unused script options: `health-check.sh --continue`, `monitor.sh --memory-threshold/--disk-threshold`,
+  `migrate-from-existing.sh -e/-n/-p` (annotated for shellcheck, behaviour unchanged).
+- [ ] Live build logs: QuickBuild 16's download servlet fails (`EOFException`) while a build runs; find
+  another source if live tailing is needed.
+- [ ] Tool names contain dots (`builds.get`); check the FastMCP gateway and Claude clients accept them, or add an
+  underscore alias scheme.
+- [ ] `gitleaks dir` (working tree) still reports the two placeholders (its fingerprints differ from the history scan CI runs).
+
+---
+
+## Hardening Phase (next)
+
+- [ ] **Inbound MCP authentication (deferred from Phase 3):** OAuth 2.1 resource-server mode for the HTTP
+  transport per the MCP authorization spec: validate bearer JWTs from the corporate IdP (issuer, audience =
+  this server, expiry, JWKS signature), publish Protected Resource Metadata, map scopes to tools
+  (`quickbuild:read` / `quickbuild:write`), log the caller's identity per tool call. Never pass the caller's
+  token through to QuickBuild. Needs: IdP (issuer/audience/scopes) and how the FastMCP gateway obtains or
+  forwards the backend token. The MCP SDK already provides `AuthSettings`/`TokenVerifier`, and `pyjwt[crypto]`
+  comes with it.
+- [ ] **Network controls:** Kubernetes `NetworkPolicy` (only the gateway reaches port 14002) or mTLS.
+- [ ] **Kubernetes Hardening:** `mcp-quickbuild-server` Deployment/Service (HTTP transport, `/ready` readiness,
+  `/health` liveness, secrets via `QB_TOKEN_FILE`/`QB_PASSWORD_FILE`, `QB_CA_BUNDLE` from a ConfigMap);
+  replace placeholder secrets/images; check `ReadWriteMany` PVC requirements.
+- [ ] **Additional MCP Tools & Resources:** `configurations.create`, JUnit test report resource, agent authorization.
+- [ ] **CI additions:** `ruff`/`mypy`, Trivy image scanning.
