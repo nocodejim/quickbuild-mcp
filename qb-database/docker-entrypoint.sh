@@ -104,7 +104,7 @@ main() {
     # Start SQL Server in background
     echo "Starting SQL Server..."
     if [ -x /opt/mssql/bin/launch_sqlservr.sh ]; then
-        /opt/mssql/bin/launch_sqlservr.sh &
+        /opt/mssql/bin/launch_sqlservr.sh /opt/mssql/bin/sqlservr &
     else
         /opt/mssql/bin/sqlservr &
     fi

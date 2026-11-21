@@ -28,8 +28,9 @@ RUN chmod 644 /opt/mssql-scripts/*.sql 2>/dev/null || true
 COPY qb-database/docker-entrypoint.sh /opt/mssql-scripts/
 RUN chmod +x /opt/mssql-scripts/docker-entrypoint.sh
 
-# Ensure proper ownership of data directories
-RUN chown -R mssql:root /var/opt/mssql && \
+# Ensure proper ownership of data directories (pre-create mountpoints for named volumes)
+RUN mkdir -p /var/opt/mssql/data /var/opt/mssql/log && \
+    chown -R mssql:root /var/opt/mssql && \
     chmod -R 755 /var/opt/mssql
 
 # Switch back to mssql user for security
